@@ -8,6 +8,14 @@ repositories {
     mavenCentral()
 }
 
+processResources {
+    filesMatching("**/robolectric-version.properties") {
+        filter { String line ->
+            return line.replaceAll(/\$\{project.version\}/, project.version)
+        }
+    }
+}
+
 dependencies {
     // Project dependencies
     compile project(":robolectric-annotations")
