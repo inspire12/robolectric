@@ -1,6 +1,7 @@
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.util.GFileUtils
 
 class ShadowsPlugin implements Plugin<Project> {
     @Override
@@ -15,12 +16,14 @@ class ShadowsPlugin implements Plugin<Project> {
             robolectricProcessor project.project(":robolectric-processor")
         }
 
-        project.sourceSets.main.java.srcDirs += project.files("${project.buildDir}/generated-shadows")
+        def generatedSourcesDir = "${project.buildDir}/generated-shadows"
+
+        project.sourceSets.main.java.srcDirs += project.files(generatedSourcesDir)
 
         project.task("generateShadowProvider", type: JavaCompile, description: "Generate Shadows.shadowOf()s class") { task ->
             classpath = project.configurations.compile + project.configurations.robolectricProcessor
             source = project.sourceSets.main.java
-            destinationDir = project.file("${project.buildDir}/generated-shadows")
+            destinationDir = project.file(generatedSourcesDir)
 
             doFirst {
                 options.compilerArgs.addAll(
@@ -29,8 +32,15 @@ class ShadowsPlugin implements Plugin<Project> {
                         "-Aorg.robolectric.annotation.processing.shadowPackage=${project.shadows.packageName}"
                 )
             }
-        }
 
+            doLast {
+                def src = project.file("$generatedSourcesDir/META-INF/services/org.robolectric.internal.ShadowProvider")
+                def dest = project.file("${project.buildDir}/resources/main/META-INF/services/org.robolectric.internal.ShadowProvider")
+
+                GFileUtils.mkdirs(dest.getParentFile());
+                GFileUtils.copyFile(src, dest);
+            }
+        }
 
         def compileJavaTask = project.tasks["compileJava"]
         compileJavaTask.dependsOn("generateShadowProvider")
