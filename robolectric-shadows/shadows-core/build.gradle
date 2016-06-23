@@ -20,7 +20,7 @@ def ANDROID_SDK_MAP = [
         23: "6.0.0_r1-robolectric-0",
 ]
 
-androidApi = hasProperty("androidApi") ? ext.androidApi.toInteger() : AndroidSdk.latestVersion
+def androidApi = hasProperty("androidApi") ? ext.androidApi.toInteger() : AndroidSdk.latestVersion
 def robolectricVersion = AndroidSdk.versions[androidApi]
 logger.info "Android API: $androidApi — $robolectricVersion"
 
