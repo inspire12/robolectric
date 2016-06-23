@@ -1,5 +1,5 @@
 apply plugin: "java"
-apply from: "../../provided.gradle"
+apply plugin: ProvidedPlugin
 apply plugin: ShadowsPlugin
 
 sourceCompatibility = JavaVersion.VERSION_1_7
@@ -20,10 +20,8 @@ dependencies {
     compile project(":robolectric-shadows/shadows-core")
 
     // Compile dependencies
-    compile "org.robolectric:android-all:6.0.0_r1-robolectric-0"
-    compile "com.android.support:support-v4:23.2.0"
-
-    // Runtime dependencies
+    provided "org.robolectric:android-all:6.0.0_r1-robolectric-0"
+    provided "com.android.support:support-v4:23.2.0"
     provided "com.android.support:internal_impl:23.2.0"
 
     // Testing dependencies

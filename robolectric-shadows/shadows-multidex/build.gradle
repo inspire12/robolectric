@@ -1,4 +1,5 @@
 apply plugin: "java"
+apply plugin: ProvidedPlugin
 apply plugin: ShadowsPlugin
 
 sourceCompatibility = JavaVersion.VERSION_1_7
@@ -19,7 +20,7 @@ dependencies {
 
     compile "com.android.support:multidex:1.0.1"
 
-//    compile "org.robolectric:android-all:6.0.0_r1-robolectric-0"
+    provided "org.robolectric:android-all:6.0.0_r1-robolectric-0"
 
     // Testing dependencies
     testCompile "junit:junit:4.8.2"

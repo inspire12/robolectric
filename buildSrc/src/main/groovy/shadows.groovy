@@ -21,11 +21,17 @@ class ShadowsPlugin implements Plugin<Project> {
         project.sourceSets.main.java.srcDirs += project.files(generatedSourcesDir)
 
         project.task("generateShadowProvider", type: JavaCompile, description: "Generate Shadows.shadowOf()s class") { task ->
-            classpath = project.configurations.compile + project.configurations.robolectricProcessor
+            classpath = project.configurations.robolectricProcessor
             source = project.sourceSets.main.java
             destinationDir = project.file(generatedSourcesDir)
 
             doFirst {
+                logger.info "Generating Shadows.java for ${project.name}…"
+
+                // reset our classpath at the last minute, since other plugins might mutate
+                //   compileJava's classpath and we want to pick up any changes…
+                classpath = project.tasks['compileJava'].classpath + project.configurations.robolectricProcessor
+
                 options.compilerArgs.addAll(
                         "-proc:only",
                         "-processor", "org.robolectric.annotation.processing.RobolectricProcessor",

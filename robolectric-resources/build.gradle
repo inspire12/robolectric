@@ -1,4 +1,5 @@
 apply plugin: "java"
+apply plugin: ProvidedPlugin
 
 sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
@@ -16,7 +17,7 @@ dependencies {
     // Compile dependencies
     compile "com.ximpleware:vtd-xml:2.11"
     compile "com.google.guava:guava:19.0-rc2"
-    compile "org.robolectric:android-all:6.0.0_r1-robolectric-0"
+    provided "org.robolectric:android-all:6.0.0_r1-robolectric-0"
 
     // Testing dependencies
     testCompile "junit:junit:4.8.2"
