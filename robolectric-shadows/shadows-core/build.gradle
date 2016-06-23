@@ -20,11 +20,9 @@ def ANDROID_SDK_MAP = [
         23: "6.0.0_r1-robolectric-0",
 ]
 
-def ANDROID_SDK_DEFAULT = 23
-
-def androidApi = hasProperty("androidApi") ? ext.androidApi.toInteger() : ANDROID_SDK_DEFAULT
-def robolectricVersion = ANDROID_SDK_MAP.get(androidApi)
-println "Android API: $androidApi — $robolectricVersion"
+androidApi = hasProperty("androidApi") ? ext.androidApi.toInteger() : AndroidSdk.latestVersion
+def robolectricVersion = AndroidSdk.versions[androidApi]
+logger.info "Android API: $androidApi — $robolectricVersion"
 
 task velocity(type: VelocityTask) {
     source = sourceSets.main.resources.matching { include "**/*.vm" }
