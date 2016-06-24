@@ -1,5 +1,6 @@
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.util.GFileUtils
 
@@ -26,11 +27,17 @@ class ShadowsPlugin implements Plugin<Project> {
             destinationDir = project.file(generatedSourcesDir)
 
             doFirst {
+                println("ZZzzzzzzzzzzzzzz ${project.name} ${project.shadows.packageName}")
                 logger.info "Generating Shadows.java for ${project.name}…"
 
                 // reset our classpath at the last minute, since other plugins might mutate
                 //   compileJava's classpath and we want to pick up any changes…
+//                def additionalSources = project.shadows.additionalShadowSources
+//                def additionalSources = project.findProject(project.shadows.otherProjName).files("src/main/java")
+//                println("additionalSources: ${additionalSources}")
+//                source += additionalSources
                 classpath = project.tasks['compileJava'].classpath + project.configurations.robolectricProcessor
+//                println "classpath: ${classpath.files}"
 
                 options.compilerArgs.addAll(
                         "-proc:only",
@@ -50,6 +57,7 @@ class ShadowsPlugin implements Plugin<Project> {
 
         def compileJavaTask = project.tasks["compileJava"]
         compileJavaTask.dependsOn("generateShadowProvider")
+//        compileJavaTask.source += project.findProject(":robolectric-shadows/shadows-core").files("src/main/java")
     }
 }
 

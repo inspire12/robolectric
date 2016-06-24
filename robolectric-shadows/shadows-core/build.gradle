@@ -1,40 +1,32 @@
-apply plugin: ShadowsPlugin
+//apply plugin: ShadowsPlugin
 apply plugin: ProvidedPlugin
-
-def ANDROID_SDK_MAP = [
-        16: "4.1.2_r1-robolectric-0",
-        17: "4.2.2_r1.2-robolectric-0",
-        18: "4.3_r2-robolectric-0",
-        19: "4.4_r1-robolectric-1",
-        21: "5.0.0_r2-robolectric-1",
-        22: "5.1.1_r9-robolectric-1",
-        23: "6.0.0_r1-robolectric-0",
-]
 
 def androidApi = hasProperty("androidApi") ? ext.androidApi.toInteger() : AndroidSdk.latestVersion
 def robolectricVersion = AndroidSdk.versions[androidApi]
 logger.info "Android API: $androidApi — $robolectricVersion"
+//
+//task velocity(type: VelocityTask) {
+//    source = sourceSets.main.resources.matching { include "**/*.vm" }
+//
+//    contextValues = [api: androidApi]
+//    if (androidApi >= 21) {
+//        contextValues.putAll(ptrClass: "long", ptrClassBoxed: "Long")
+//    } else {
+//        contextValues.putAll(ptrClass: "int", ptrClassBoxed: "Integer")
+//    }
+//
+//    outputDir = file("$buildDir/generated-shadows")
+//}
+//
+//shadows {
+//    packageName "org.robolectric"
+//}
+//
+//generateShadowProvider {
+//    dependsOn velocity
+//}
 
-task velocity(type: VelocityTask) {
-    source = sourceSets.main.resources.matching { include "**/*.vm" }
-
-    contextValues = [api: androidApi]
-    if (androidApi >= 21) {
-        contextValues.putAll(ptrClass: "long", ptrClassBoxed: "Long")
-    } else {
-        contextValues.putAll(ptrClass: "int", ptrClassBoxed: "Integer")
-    }
-
-    outputDir = file("$buildDir/generated-shadows")
-}
-
-shadows {
-    packageName "org.robolectric"
-}
-
-generateShadowProvider {
-    dependsOn velocity
-}
+compileJava.onlyIf { false }
 
 dependencies {
     // Project dependencies

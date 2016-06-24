@@ -7,7 +7,7 @@ shadows {
 dependencies {
     // Project dependencies
     compile project(":robolectric")
-    compile project(":robolectric-shadows/shadows-core")
+    compile project(":robolectric-shadows/shadows-core/v23")
 
     // Compile dependencies
     compile "org.apache.httpcomponents:httpclient:4.0.3"

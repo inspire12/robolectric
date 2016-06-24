@@ -8,12 +8,12 @@ shadows {
 dependencies {
     // Project dependencies
     compile project(":robolectric")
-    compile project(":robolectric-shadows/shadows-core")
+    compile project(":robolectric-shadows/shadows-core/v23")
 
     // Compile dependencies
     provided "org.robolectric:android-all:6.0.0_r1-robolectric-0"
-    provided "com.android.support:support-v4:23.2.0"
-    provided "com.android.support:internal_impl:23.2.0"
+    compile "com.android.support:support-v4:23.2.0"
+    compile "com.android.support:internal_impl:23.2.0"
 
     // Testing dependencies
     testCompile "junit:junit:4.8.2"
