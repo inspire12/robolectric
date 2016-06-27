@@ -23,10 +23,7 @@ import org.robolectric.internal.ParallelUniverseInterface;
 import org.robolectric.internal.SdkConfig;
 import org.robolectric.internal.SdkEnvironment;
 import org.robolectric.internal.bytecode.*;
-import org.robolectric.internal.dependency.CachedDependencyResolver;
-import org.robolectric.internal.dependency.DependencyResolver;
-import org.robolectric.internal.dependency.LocalDependencyResolver;
-import org.robolectric.internal.dependency.MavenDependencyResolver;
+import org.robolectric.internal.dependency.*;
 import org.robolectric.manifest.AndroidManifest;
 import org.robolectric.res.OverlayResourceLoader;
 import org.robolectric.res.PackageResourceLoader;
@@ -47,6 +44,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URL;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -102,11 +100,40 @@ public class RobolectricTestRunner extends BlockJUnit4ClassRunner {
       } else {
         File cacheDir = new File(new File(System.getProperty("java.io.tmpdir")), "robolectric");
 
+        final DependencyResolver dependencyResolver = new MavenDependencyResolver();
+//        DependencyResolver dependencyResolver = new DependencyResolver() {
+//          final DependencyResolver delegate = new MavenDependencyResolver();
+//
+//          @Override
+//          public URL[] getLocalArtifactUrls(DependencyJar... dependencies) {
+//
+//
+//            URL[] urls = delegate.getLocalArtifactUrls(dependencies);
+//            for (int i = 0; i < dependencies.length; i++) {
+//              DependencyJar dependency = dependencies[i];
+//
+//              boolean matches = dependency.getGroupId().equals("org.robolectric")
+//                      && dependency.getArtifactId().equals("shadows-core");
+//              if (matches) {
+//                // todo not this!
+////          urls[i] = new URL("file:/usr/local/google/home/christianw/Dev/robolectric/robolectric-shadows/shadows-core/v19/build/classes/main");
+////                urls[i] = new URL("file:/usr/local/google/home/christianw/Dev/robolectric/robolectric-shadows/shadows-core/build/libs/robolectric-shadows/shadows-core-3.2-gradle-SNAPSHOT.jar");
+//              }
+//            }
+//            return urls;
+//          }
+//
+//          @Override
+//          public URL getLocalArtifactUrl (DependencyJar dependency){
+//            return delegate.getLocalArtifactUrl(dependency);
+//          }
+//        };
+
         if (cacheDir.exists() || cacheDir.mkdir()) {
           Logger.info("Dependency cache location: %s", cacheDir.getAbsolutePath());
-          dependencyResolver = new CachedDependencyResolver(new MavenDependencyResolver(), cacheDir, 60 * 60 * 24 * 1000);
+          this.dependencyResolver = new CachedDependencyResolver(dependencyResolver, cacheDir, 60 * 60 * 24 * 1000);
         } else {
-          dependencyResolver = new MavenDependencyResolver();
+          this.dependencyResolver = dependencyResolver;
         }
       }
     }

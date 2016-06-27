@@ -138,7 +138,7 @@ public class InstrumentingClassLoader extends ClassLoader implements Opcodes {
   @Override
   public Enumeration<URL> getResources(String name) throws IOException {
     Enumeration<URL> fromUrlsClassLoader = urls.getResources(name);
-    if (fromUrlsClassLoader != null)  {
+    if (fromUrlsClassLoader != null && fromUrlsClassLoader.hasMoreElements())  {
       return fromUrlsClassLoader;
     }
     return super.getResources(name);
