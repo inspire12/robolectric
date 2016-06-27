@@ -41,8 +41,8 @@ public class InstrumentingClassLoaderFactory {
     SdkEnvironment sdkEnvironment = sdkToEnvironment.get(key);
     if (sdkEnvironment == null) {
       URL[] urls = dependencyResolver.getLocalArtifactUrls(
-          sdkConfig.getAndroidSdkDependency()/*,
-          sdkConfig.getCoreShadowsDependency()*/);
+          sdkConfig.getAndroidSdkDependency(),
+          sdkConfig.getCoreShadowsDependency());
 
       ClassLoader robolectricClassLoader = new InstrumentingClassLoader(instrumentationConfig, urls);
       sdkEnvironment = new SdkEnvironment(sdkConfig, robolectricClassLoader);

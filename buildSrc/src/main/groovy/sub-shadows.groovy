@@ -32,6 +32,7 @@ class SubShadowsPlugin implements Plugin<Project> {
                 def shadowsCoreProj = project.findProject(":robolectric-shadows/shadows-core")
                 project.copy {
                     from shadowsCoreProj.files("src/main/java")
+                    from shadowsCoreProj.fileTree("src/main/resources").include("META-INF/**")
                     into outputDir
                 }
             }

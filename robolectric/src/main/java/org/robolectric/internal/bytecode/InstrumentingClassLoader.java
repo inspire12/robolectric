@@ -37,13 +37,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.lang.invoke.MethodType.methodType;
 import static org.objectweb.asm.Type.ARRAY;
@@ -139,6 +133,15 @@ public class InstrumentingClassLoader extends ClassLoader implements Opcodes {
       return fromUrlsClassLoader;
     }
     return super.getResourceAsStream(resName);
+  }
+
+  @Override
+  public Enumeration<URL> getResources(String name) throws IOException {
+    Enumeration<URL> fromUrlsClassLoader = urls.getResources(name);
+    if (fromUrlsClassLoader != null)  {
+      return fromUrlsClassLoader;
+    }
+    return super.getResources(name);
   }
 
   @Override

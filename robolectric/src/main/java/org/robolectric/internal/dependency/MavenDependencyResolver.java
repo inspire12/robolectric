@@ -56,7 +56,13 @@ public class MavenDependencyResolver implements DependencyResolver {
     URL[] urls = new URL[dependencies.length];
     for (int i = 0; i < urls.length; i++) {
       try {
-        urls[i] = Util.url(artifacts.get(key(dependencies[i])));
+        if (dependencies[i].getArtifactId().equals("shadows-core")) {
+          // todo not this!
+//          urls[i] = new URL("file:/usr/local/google/home/christianw/Dev/robolectric/robolectric-shadows/shadows-core/v19/build/classes/main");
+          urls[i] = new URL("file:/usr/local/google/home/christianw/Dev/robolectric/robolectric-shadows/shadows-core/build/libs/robolectric-shadows/shadows-core-3.2-SNAPSHOT.jar");
+        } else {
+          urls[i] = Util.url(artifacts.get(key(dependencies[i])));
+        }
       } catch (MalformedURLException e) {
         throw new RuntimeException(e);
       }
