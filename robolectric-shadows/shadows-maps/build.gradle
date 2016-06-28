@@ -1,14 +1,5 @@
-apply plugin: "java"
 apply plugin: ProvidedPlugin
 apply plugin: ShadowsPlugin
-
-sourceCompatibility = JavaVersion.VERSION_1_7
-targetCompatibility = JavaVersion.VERSION_1_7
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
 
 shadows {
     packageName "org.robolectric.shadows.maps"

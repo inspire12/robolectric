@@ -1,13 +1,4 @@
-apply plugin: "java"
 apply plugin: ProvidedPlugin
-
-sourceCompatibility = JavaVersion.VERSION_1_7
-targetCompatibility = JavaVersion.VERSION_1_7
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
 
 processResources {
     filesMatching("**/robolectric-version.properties") {

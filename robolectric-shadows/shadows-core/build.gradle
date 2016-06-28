@@ -1,14 +1,5 @@
-apply plugin: "java"
 apply plugin: ShadowsPlugin
 apply plugin: ProvidedPlugin
-
-sourceCompatibility = JavaVersion.VERSION_1_7
-targetCompatibility = JavaVersion.VERSION_1_7
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
 
 def ANDROID_SDK_MAP = [
         16: "4.1.2_r1-robolectric-0",
