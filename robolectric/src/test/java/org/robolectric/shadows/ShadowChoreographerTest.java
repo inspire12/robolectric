@@ -1,49 +1,92 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.view.Choreographer;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mockito;
-import org.robolectric.TestRunners;
-import org.robolectric.util.TimeUtils;
+import org.robolectric.shadow.api.Shadow;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+/** Unit tests for {@link ShadowChoreographer}. */
+@RunWith(AndroidJUnit4.class)
 public class ShadowChoreographerTest {
 
   @Test
-  public void setFrameInterval_shouldUpdateFrameInterval() {
-    final long frameInterval = 10 * TimeUtils.NANOS_PER_MS;
-    ShadowChoreographer.setFrameInterval(frameInterval);
-
-    final Choreographer instance = ShadowChoreographer.getInstance();
-    long time1 = instance.getFrameTimeNanos();
-    long time2 = instance.getFrameTimeNanos();
-
-    assertThat(time2 - time1).isEqualTo(frameInterval);
+  public void isValid() {
+    ShadowPausedChoreographer shadowPausedChoreographer =
+        Shadow.extract(Choreographer.getInstance());
+    assertThat(shadowPausedChoreographer.isInitialized()).isTrue();
   }
 
   @Test
-  public void removeFrameCallback_shouldRemoveCallback() {
-    Choreographer instance = ShadowChoreographer.getInstance();
-    Choreographer.FrameCallback callback = mock(Choreographer.FrameCallback.class);
-    instance.postFrameCallbackDelayed(callback, 1000);
-    instance.removeFrameCallback(callback);
-    ShadowApplication.getInstance().getForegroundThreadScheduler().advanceToLastPostedRunnable();
-    verify(callback, never()).doFrame(anyInt());
+  public void setPaused_isPaused_doesntRun() {
+    ShadowChoreographer.setPaused(true);
+    long startTime = ShadowSystem.nanoTime();
+    AtomicBoolean didRun = new AtomicBoolean();
+
+    Choreographer.getInstance().postFrameCallback(frameTimeNanos -> didRun.set(true));
+    ShadowLooper.idleMainLooper();
+
+    assertThat(ShadowSystem.nanoTime()).isEqualTo(startTime);
+    assertThat(didRun.get()).isFalse();
   }
 
   @Test
-  public void reset_shouldResetFrameInterval() {
-    ShadowChoreographer.setFrameInterval(1);
-    assertThat(ShadowChoreographer.getFrameInterval()).isEqualTo(1);
+  public void setPaused_isPaused_doesntRunWhenClockAdvancedLessThanFrameDelay() {
+    ShadowChoreographer.setPaused(true);
+    ShadowChoreographer.setFrameDelay(Duration.ofMillis(15));
+    AtomicBoolean didRun = new AtomicBoolean();
 
-    ShadowChoreographer.reset();
-    assertThat(ShadowChoreographer.getFrameInterval()).isEqualTo(10 * TimeUtils.NANOS_PER_MS);
+    Choreographer.getInstance().postFrameCallback(frameTimeNanos -> didRun.set(true));
+    ShadowSystemClock.advanceBy(Duration.ofMillis(14));
+    ShadowLooper.idleMainLooper();
+
+    assertThat(didRun.get()).isFalse();
+  }
+
+  @Test
+  public void setPaused_isPaused_runsWhenClockAdvanced() {
+    ShadowChoreographer.setPaused(true);
+    ShadowChoreographer.setFrameDelay(Duration.ofMillis(15));
+    long startTime = ShadowSystem.nanoTime();
+    AtomicLong frameTimeNanos = new AtomicLong(-1);
+
+    Choreographer.getInstance().postFrameCallback(frameTimeNanos::set);
+    ShadowSystemClock.advanceBy(Duration.ofMillis(15));
+    ShadowLooper.idleMainLooper();
+
+    assertThat(frameTimeNanos.get()).isEqualTo(startTime + Duration.ofMillis(15).toNanos());
+  }
+
+  @Test
+  public void setPaused_isNotPaused_advancesClockAndRuns() {
+    ShadowChoreographer.setPaused(false);
+    ShadowChoreographer.setFrameDelay(Duration.ofMillis(15));
+    long startTime = ShadowSystem.nanoTime();
+    AtomicBoolean didRun = new AtomicBoolean();
+
+    Choreographer.getInstance().postFrameCallback(frameTimeNanos -> didRun.set(true));
+    ShadowLooper.idleMainLooper();
+
+    assertThat(ShadowSystem.nanoTime()).isEqualTo(startTime + Duration.ofMillis(15).toNanos());
+    assertThat(didRun.get()).isTrue();
+  }
+
+  @Test
+  public void setFrameDelay() {
+    ShadowChoreographer.setPaused(false);
+    ShadowChoreographer.setFrameDelay(Duration.ofMillis(30));
+    long startTime = ShadowSystem.nanoTime();
+    AtomicBoolean didRun = new AtomicBoolean();
+
+    Choreographer.getInstance().postFrameCallback(frameTimeNanos -> didRun.set(true));
+    ShadowLooper.idleMainLooper();
+
+    assertThat(ShadowSystem.nanoTime()).isEqualTo(startTime + Duration.ofMillis(30).toNanos());
+    assertThat(didRun.get()).isTrue();
   }
 }

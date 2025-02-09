@@ -1,23 +1,26 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.view.ViewGroup;
 import android.widget.AbsoluteLayout;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowAbsoluteLayoutTest {
+
   @Test
-  public void getLayoutParams_shouldReturnAbsoluteLayoutParams() throws Exception {
-    ViewGroup.LayoutParams layoutParams = (new AbsoluteLayout(RuntimeEnvironment.application) {
-      @Override protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
-        return super.generateDefaultLayoutParams();
-      }
-    }).generateDefaultLayoutParams();
+  public void getLayoutParams_shouldReturnAbsoluteLayoutParams() {
+    ViewGroup.LayoutParams layoutParams =
+        new AbsoluteLayout(ApplicationProvider.getApplicationContext()) {
+          @Override
+          protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+            return super.generateDefaultLayoutParams();
+          }
+        }.generateDefaultLayoutParams();
 
     assertThat(layoutParams).isInstanceOf(AbsoluteLayout.LayoutParams.class);
   }

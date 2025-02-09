@@ -1,16 +1,15 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
 
 import android.hardware.Camera;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
-import org.robolectric.internal.Shadow;
+import org.robolectric.shadow.api.Shadow;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowCameraSizeTest {
 
   private Camera.Size cameraSize;
@@ -21,23 +20,22 @@ public class ShadowCameraSizeTest {
   }
 
   @Test
-  public void testConstructor() throws Exception {
+  public void testConstructor() {
     assertThat(cameraSize.width).isEqualTo(480);
     assertThat(cameraSize.height).isEqualTo(320);
   }
 
   @Test
-  public void testSetWidth() throws Exception {
+  public void testSetWidth() {
     assertThat(cameraSize.width).isNotEqualTo(640);
     cameraSize.width = 640;
     assertThat(cameraSize.width).isEqualTo(640);
   }
 
   @Test
-  public void testSetHeight() throws Exception {
+  public void testSetHeight() {
     assertThat(cameraSize.height).isNotEqualTo(480);
     cameraSize.height = 480;
     assertThat(cameraSize.height).isEqualTo(480);
   }
-
 }

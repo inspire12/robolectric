@@ -1,24 +1,27 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.webkit.CookieManager;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import com.google.common.base.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
-import org.robolectric.internal.Shadow;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowCookieManagerTest {
   private final String url = "robolectric.org/";
   private final String httpUrl = "http://robolectric.org/";
   private final String httpsUrl = "https://robolectric.org/";
   private final CookieManager cookieManager = CookieManager.getInstance();
 
+  private Optional<Boolean> cookiesSet = Optional.absent();
+  private Optional<Boolean> cookiesRemoved = Optional.absent();
+
   @Test
   public void shouldGetASingletonInstance() {
     assertThat(CookieManager.getInstance()).isNotNull();
-    assertThat(CookieManager.getInstance()).isSameAs(CookieManager.getInstance());
+    assertThat(CookieManager.getInstance()).isSameInstanceAs(CookieManager.getInstance());
   }
 
   @Test
@@ -27,6 +30,32 @@ public class ShadowCookieManagerTest {
     String url = "http://www.google.com";
     String value = "my cookie";
     cookieManager.setCookie(url, value);
+    assertThat(cookieManager.getCookie(url)).isEqualTo(value);
+  }
+
+  @Test
+  public void shouldGetCookieWhenSetAsyncWithNormalCallback() {
+    CookieManager cookieManager = CookieManager.getInstance();
+    String url = "http://www.google.com";
+    String value = "my cookie";
+
+    cookieManager.setCookie(
+        url,
+        value,
+        result -> {
+          cookiesSet = Optional.of(result);
+        });
+
+    assertThat(cookiesSet).hasValue(true);
+    assertThat(cookieManager.getCookie(url)).isEqualTo(value);
+  }
+
+  @Test
+  public void shouldGetCookieWhenSetAsyncWithNullCallback() {
+    CookieManager cookieManager = CookieManager.getInstance();
+    String url = "http://www.google.com";
+    String value = "my cookie";
+    cookieManager.setCookie(url, value, null);
     assertThat(cookieManager.getCookie(url)).isEqualTo(value);
   }
 
@@ -94,13 +123,13 @@ public class ShadowCookieManagerTest {
 
   @Test
   public void shouldHaveCookieWhenCookieIsSet() {
-    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2021 10:18:14 GMT");
-    assertThat(cookieManager.hasCookies()).isEqualTo(true);
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+    assertThat(cookieManager.hasCookies()).isTrue();
   }
 
   @Test
   public void shouldNotHaveCookieWhenCookieIsNotSet() {
-    assertThat(cookieManager.hasCookies()).isEqualTo(false);
+    assertThat(cookieManager.hasCookies()).isFalse();
   }
 
   @Test
@@ -134,13 +163,13 @@ public class ShadowCookieManagerTest {
 
   @Test
   public void shouldSetTwoCookies() {
-    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2021 10:18:14 GMT");
-    cookieManager.setCookie(url, "name2=value2; Expires=Wed, 09 Jun 2021 10:18:14 GMT");
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+    cookieManager.setCookie(url, "name2=value2; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
     assertThat(cookieManager.getCookie(url)).isEqualTo("name=value; name2=value2");
   }
 
   @Test
-  public void shouldSetCookieWithInvalidExpiesValue() {
+  public void shouldSetCookieWithInvalidExpiresValue() {
     cookieManager.setCookie(httpUrl, "name=value; Expires=3234asdfasdf10:18:14 GMT");
     assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
   }
@@ -162,14 +191,27 @@ public class ShadowCookieManagerTest {
     cookieManager.setAcceptCookie(false);
     cookieManager.setCookie(httpUrl, "name=value; Expires=3234asdfasdf10:18:14 GMT");
     assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
-    assertThat(cookieManager.acceptCookie()).isEqualTo(false);
+    assertThat(cookieManager.acceptCookie()).isFalse();
   }
 
   @Test
   public void shouldRemoveAllCookie() {
-    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2021 10:18:14 GMT");
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
     cookieManager.setCookie(url, "name2=value2;");
     cookieManager.removeAllCookie();
+    assertThat(cookieManager.getCookie(url)).isNull();
+  }
+
+  @Test
+  public void shouldRemoveAllCookiesWithCallback() {
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+    cookieManager.setCookie(url, "name2=value2;");
+
+    cookieManager.removeAllCookies(
+        ok -> {
+          cookiesRemoved = Optional.of(ok);
+        });
+    assertThat(cookiesRemoved).hasValue(true);
     assertThat(cookieManager.getCookie(url)).isNull();
   }
 
@@ -183,9 +225,43 @@ public class ShadowCookieManagerTest {
 
   @Test
   public void shouldRemoveSessionCookie() {
-    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2021 10:18:14 GMT");
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
     cookieManager.setCookie(url, "name2=value2;");
     cookieManager.removeSessionCookie();
+    assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
+  }
+
+  @Test
+  public void shouldRemoveSessionCookiesWithNormalCallback() {
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+    cookieManager.setCookie(url, "name2=value2;");
+
+    cookieManager.removeSessionCookies(
+        ok -> {
+          cookiesRemoved = Optional.of(ok);
+        });
+    assertThat(cookiesRemoved).hasValue(true);
+    assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
+  }
+
+  @Test
+  public void shouldRemoveSessionCookiesWithNullCallback() {
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+    cookieManager.setCookie(url, "name2=value2;");
+
+    cookieManager.removeSessionCookies(null);
+    assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
+  }
+
+  @Test
+  public void shouldRemoveSessionCookiesWhenSessionCookieIsNoPresent() {
+    cookieManager.setCookie(url, "name=value; Expires=Wed, 09 Jun 2121 10:18:14 GMT");
+
+    cookieManager.removeSessionCookies(
+        ok -> {
+          cookiesRemoved = Optional.of(ok);
+        });
+    assertThat(cookiesRemoved).hasValue(false);
     assertThat(cookieManager.getCookie(url)).isEqualTo("name=value");
   }
 
@@ -208,6 +284,15 @@ public class ShadowCookieManagerTest {
     String cookie = cookieManager.getCookie(httpUrl);
     assertThat(cookie.contains("name2=value2")).isTrue();
     assertThat(cookie.contains("name1=value1")).isFalse();
+  }
+
+  @Test
+  public void shouldIgnoreExtraKeysInCookieString() {
+    cookieManager.setCookie(httpsUrl, "name1=value1; name2=value2; Secure");
+
+    String cookie = cookieManager.getCookie(httpsUrl);
+    assertThat(cookie).contains("name1=value1");
+    assertThat(cookie).doesNotContain("name2=value2");
   }
 
   @Test

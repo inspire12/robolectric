@@ -1,53 +1,61 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertNull;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.app.Activity;
+import android.app.Application;
 import android.app.TabActivity;
 import android.view.View;
 import android.widget.TabHost;
-import android.widget.TabHost.TabContentFactory;
 import android.widget.TabWidget;
 import android.widget.TextView;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.R;
 import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertNull;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowTabHostTest {
 
+  private Application context;
+
+  @Before
+  public void setUp() throws Exception {
+    context = ApplicationProvider.getApplicationContext();
+  }
+
   @Test
-  public void newTabSpec_shouldMakeATabSpec() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void newTabSpec_shouldMakeATabSpec() {
+    TabHost tabHost = new TabHost(context);
     TabHost.TabSpec tabSpec = tabHost.newTabSpec("Foo");
     assertThat(tabSpec.getTag()).isEqualTo("Foo");
   }
 
   @Test
   public void shouldAddTabsToLayoutWhenAddedToHost() {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+    TabHost tabHost = new TabHost(context);
 
-    View fooView = new View(RuntimeEnvironment.application);
+    View fooView = new View(context);
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo").setIndicator(fooView);
 
-    View barView = new View(RuntimeEnvironment.application);
+    View barView = new View(context);
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar").setIndicator(barView);
 
     tabHost.addTab(foo);
     tabHost.addTab(bar);
 
-    assertThat(tabHost.getChildAt(0)).isSameAs(fooView);
-    assertThat(tabHost.getChildAt(1)).isSameAs(barView);
+    assertThat(tabHost.getChildAt(0)).isSameInstanceAs(fooView);
+    assertThat(tabHost.getChildAt(1)).isSameInstanceAs(barView);
   }
 
   @Test
-  public void shouldReturnTabSpecsByTag() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void shouldReturnTabSpecsByTag() {
+    TabHost tabHost = new TabHost(context);
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar");
     TabHost.TabSpec baz = tabHost.newTabSpec("Baz");
@@ -56,14 +64,14 @@ public class ShadowTabHostTest {
     tabHost.addTab(bar);
     tabHost.addTab(baz);
 
-    assertThat(shadowOf(tabHost).getSpecByTag("Bar")).isSameAs(bar);
-    assertThat(shadowOf(tabHost).getSpecByTag("Baz")).isSameAs(baz);
+    assertThat(shadowOf(tabHost).getSpecByTag("Bar")).isSameInstanceAs(bar);
+    assertThat(shadowOf(tabHost).getSpecByTag("Baz")).isSameInstanceAs(baz);
     assertNull(shadowOf(tabHost).getSpecByTag("Whammie"));
   }
 
   @Test
-  public void shouldFireTheTabChangeListenerWhenCurrentTabIsSet() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void shouldFireTheTabChangeListenerWhenCurrentTabIsSet() {
+    TabHost tabHost = new TabHost(context);
 
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar");
@@ -82,8 +90,8 @@ public class ShadowTabHostTest {
   }
 
   @Test
-  public void shouldFireTheTabChangeListenerWhenTheCurrentTabIsSetByTag() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void shouldFireTheTabChangeListenerWhenTheCurrentTabIsSetByTag() {
+    TabHost tabHost = new TabHost(context);
 
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar");
@@ -103,16 +111,17 @@ public class ShadowTabHostTest {
 
   @Test
   public void shouldRetrieveTheCurrentViewFromTabContentFactory() {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+    TabHost tabHost = new TabHost(context);
 
-    TabHost.TabSpec foo = tabHost.newTabSpec("Foo").setContent(
-    new TabContentFactory() {
-      public View createTabContent(String tag) {
-        TextView tv = new TextView(RuntimeEnvironment.application);
-        tv.setText("The Text of " + tag);
-        return tv;
-      }
-    });
+    TabHost.TabSpec foo =
+        tabHost
+            .newTabSpec("Foo")
+            .setContent(
+                tag -> {
+                  TextView tv = new TextView(context);
+                  tv.setText("The Text of " + tag);
+                  return tv;
+                });
 
     tabHost.addTab(foo);
     tabHost.setCurrentTabByTag("Foo");
@@ -120,17 +129,17 @@ public class ShadowTabHostTest {
 
     assertThat(textView.getText().toString()).isEqualTo("The Text of Foo");
   }
+
   @Test
   public void shouldRetrieveTheCurrentViewFromViewId() {
     Activity activity = Robolectric.buildActivity(Activity.class).create().get();
     activity.setContentView(org.robolectric.R.layout.main);
     TabHost tabHost = new TabHost(activity);
-    TabHost.TabSpec foo = tabHost.newTabSpec("Foo")
-    .setContent(org.robolectric.R.id.title);
+    TabHost.TabSpec foo = tabHost.newTabSpec("Foo").setContent(org.robolectric.R.id.title);
 
-     tabHost.addTab(foo);
-     tabHost.setCurrentTabByTag("Foo");
-     TextView textView = (TextView) tabHost.getCurrentView();
+    tabHost.addTab(foo);
+    tabHost.setCurrentTabByTag("Foo");
+    TextView textView = (TextView) tabHost.getCurrentView();
 
     assertThat(textView.getText().toString()).isEqualTo("Main Layout");
   }
@@ -145,8 +154,8 @@ public class ShadowTabHostTest {
   }
 
   @Test
-  public void canGetCurrentTabTag() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void canGetCurrentTabTag() {
+    TabHost tabHost = new TabHost(context);
 
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar");
@@ -162,8 +171,8 @@ public class ShadowTabHostTest {
   }
 
   @Test
-  public void canGetCurrentTab() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void canGetCurrentTab() {
+    TabHost tabHost = new TabHost(context);
 
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     TabHost.TabSpec bar = tabHost.newTabSpec("Bar");
@@ -186,8 +195,8 @@ public class ShadowTabHostTest {
   }
 
   @Test
-  public void setCurrentTabByTagShouldAcceptNullAsParameter() throws Exception {
-    TabHost tabHost = new TabHost(RuntimeEnvironment.application);
+  public void setCurrentTabByTagShouldAcceptNullAsParameter() {
+    TabHost tabHost = new TabHost(context);
     TabHost.TabSpec foo = tabHost.newTabSpec("Foo");
     tabHost.addTab(foo);
 
@@ -196,7 +205,7 @@ public class ShadowTabHostTest {
   }
 
   @Test
-  public void shouldGetTabWidget() throws Exception {
+  public void shouldGetTabWidget() {
     TabActivity activity = Robolectric.buildActivity(TabActivity.class).create().get();
     activity.setContentView(R.layout.tab_activity);
     TabHost host = new TabHost(activity);

@@ -1,18 +1,17 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.graphics.Rect;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowRectTest {
   @Before
-  public void setUp() {
-  }
+  public void setUp() {}
 
   @Test
   public void constructorSetsCoordinates() {

@@ -1,29 +1,32 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.shadows.ShadowLooper.shadowMainLooper;
+
 import android.content.Context;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Filter;
 import android.widget.Filterable;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowAutoCompleteTextViewTest {
-  private final AutoCompleteAdapter adapter = new AutoCompleteAdapter(RuntimeEnvironment.application);
+  private final AutoCompleteAdapter adapter =
+      new AutoCompleteAdapter(ApplicationProvider.getApplicationContext());
 
   @Test
-  public void shouldInvokeFilter() throws Exception {
-    Robolectric.getForegroundThreadScheduler().pause();
-    AutoCompleteTextView view = new AutoCompleteTextView(RuntimeEnvironment.application);
+  public void shouldInvokeFilter() {
+    shadowMainLooper().pause();
+    AutoCompleteTextView view =
+        new AutoCompleteTextView(ApplicationProvider.getApplicationContext());
     view.setAdapter(adapter);
 
     view.setText("Foo");
@@ -35,6 +38,7 @@ public class ShadowAutoCompleteTextViewTest {
       super(context, android.R.layout.simple_list_item_1);
     }
 
+    @Nonnull
     @Override
     public Filter getFilter() {
       return new AutoCompleteFilter();

@@ -1,18 +1,18 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.os.Bundle;
 import android.preference.DialogPreference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceScreen;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.R;
 import org.robolectric.Robolectric;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowDialogPreferenceTest {
 
   @Test
@@ -20,11 +20,11 @@ public class ShadowDialogPreferenceTest {
     final PreferenceScreen screen = inflatePreferenceActivity();
     final DialogPreference preference = (DialogPreference) screen.findPreference("dialog");
 
-    assertThat(preference.getTitle()).isEqualTo("Dialog Preference");
-    assertThat(preference.getSummary()).isEqualTo("This is the dialog summary");
-    assertThat(preference.getDialogMessage()).isEqualTo("This is the dialog message");
-    assertThat(preference.getPositiveButtonText()).isEqualTo("YES");
-    assertThat(preference.getNegativeButtonText()).isEqualTo("NO");
+    assertThat(preference.getTitle().toString()).isEqualTo("Dialog Preference");
+    assertThat(preference.getSummary().toString()).isEqualTo("This is the dialog summary");
+    assertThat(preference.getDialogMessage().toString()).isEqualTo("This is the dialog message");
+    assertThat(preference.getPositiveButtonText().toString()).isEqualTo("YES");
+    assertThat(preference.getNegativeButtonText().toString()).isEqualTo("NO");
   }
 
   private PreferenceScreen inflatePreferenceActivity() {
@@ -32,6 +32,7 @@ public class ShadowDialogPreferenceTest {
     return activity.getPreferenceScreen();
   }
 
+  @SuppressWarnings("FragmentInjection")
   private static class TestPreferenceActivity extends PreferenceActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {

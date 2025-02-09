@@ -1,148 +1,183 @@
 package org.robolectric.shadows;
 
-import android.app.Activity;
-import android.content.Context;
-import android.graphics.BitmapFactory;
-import android.graphics.Point;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
-import android.os.Build;
-import android.os.Bundle;
-import android.util.AttributeSet;
-import android.view.ContextMenu;
-import android.view.HapticFeedbackConstants;
-import android.view.MotionEvent;
-import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
-import android.view.View.MeasureSpec;
-import android.view.View.OnClickListener;
-import android.view.View.OnLongClickListener;
-import android.view.WindowManager;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.R;
-import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.annotation.AccessibilityChecks;
-import org.robolectric.annotation.Config;
-import org.robolectric.util.TestOnClickListener;
-import org.robolectric.util.TestOnLongClickListener;
-import org.robolectric.util.TestRunnable;
-import org.robolectric.util.Transcript;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static junit.framework.Assert.assertEquals;
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.robolectric.Robolectric.buildActivity;
+import static org.robolectric.Robolectric.setupActivity;
 import static org.robolectric.Shadows.shadowOf;
+import static org.robolectric.shadows.ShadowLooper.shadowMainLooper;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+import android.app.Activity;
+import android.app.Application;
+import android.content.Context;
+import android.graphics.BitmapFactory;
+import android.graphics.Point;
+import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Bundle;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.util.AttributeSet;
+import android.view.ContextMenu;
+import android.view.HapticFeedbackConstants;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.MeasureSpec;
+import android.view.View.OnClickListener;
+import android.view.View.OnLongClickListener;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.view.WindowId;
+import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.Transformation;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nonnull;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.R;
+import org.robolectric.Robolectric;
+import org.robolectric.android.DeviceConfig;
+import org.robolectric.android.controller.ActivityController;
+import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.annotation.GraphicsMode.Mode;
+import org.robolectric.annotation.ResourcesMode;
+import org.robolectric.util.TestRunnable;
+
+@RunWith(AndroidJUnit4.class)
+@GraphicsMode(Mode.LEGACY)
 public class ShadowViewTest {
   private View view;
-  private Transcript transcript;
+  private List<String> transcript;
+  private Application context;
 
   @Before
   public void setUp() throws Exception {
-    transcript = new Transcript();
-    view = new View(RuntimeEnvironment.application);
+    InstrumentationRegistry.getInstrumentation().setInTouchMode(false);
+    transcript = new ArrayList<>();
+    context = ApplicationProvider.getApplicationContext();
+    view = setupActivity(ContainerActivity.class).getView();
+  }
+
+  public static class ContainerActivity extends Activity {
+
+    private TextView view;
+
+    @Override
+    protected void onResume() {
+      super.onResume();
+      LinearLayout parent = new LinearLayout(this);
+
+      // decoy to receive default focus
+      TextView otherTextView = new TextView(this);
+      otherTextView.setFocusable(true);
+      parent.addView(otherTextView);
+
+      view = new TextView(this);
+      view.setId(R.id.action_search);
+      parent.addView(view);
+      setContentView(parent);
+    }
+
+    public View getView() {
+      return view;
+    }
   }
 
   @Test
-  public void testHasNullLayoutParamsUntilAddedToParent() throws Exception {
-    assertThat(view.getLayoutParams()).isNull();
-    new LinearLayout(RuntimeEnvironment.application).addView(view);
-    assertThat(view.getLayoutParams()).isNotNull();
-  }
-
-  @Test
-  public void layout_shouldAffectWidthAndHeight() throws Exception {
-    assertThat(view.getWidth()).isEqualTo(0);
-    assertThat(view.getHeight()).isEqualTo(0);
-
+  public void layout_shouldAffectWidthAndHeight() {
     view.layout(100, 200, 303, 404);
     assertThat(view.getWidth()).isEqualTo(303 - 100);
     assertThat(view.getHeight()).isEqualTo(404 - 200);
   }
 
   @Test
-  public void measuredDimensions() throws Exception {
-    View view1 = new View(RuntimeEnvironment.application) {
-      {
-        setMeasuredDimension(123, 456);
-      }
-    };
+  public void measuredDimensions() {
+    View view1 =
+        new View(context) {
+          {
+            setMeasuredDimension(123, 456);
+          }
+        };
     assertThat(view1.getMeasuredWidth()).isEqualTo(123);
     assertThat(view1.getMeasuredHeight()).isEqualTo(456);
   }
 
   @Test
-  public void layout_shouldCallOnLayoutOnlyIfChanged() throws Exception {
-    View view1 = new View(RuntimeEnvironment.application) {
-      @Override
-      protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        transcript.add("onLayout " + changed + " " + left + " " + top + " " + right + " " + bottom);
-      }
-    };
+  public void layout_shouldCallOnLayoutOnlyIfChanged() {
+    View view1 =
+        new View(context) {
+          @Override
+          protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            transcript.add(
+                "onLayout " + changed + " " + left + " " + top + " " + right + " " + bottom);
+          }
+        };
     view1.layout(0, 0, 0, 0);
-    transcript.assertNoEventsSoFar();
+    assertThat(transcript).isEmpty();
     view1.layout(1, 2, 3, 4);
-    transcript.assertEventsSoFar("onLayout true 1 2 3 4");
+    assertThat(transcript).containsExactly("onLayout true 1 2 3 4");
+    transcript.clear();
     view1.layout(1, 2, 3, 4);
-    transcript.assertNoEventsSoFar();
+    assertThat(transcript).isEmpty();
   }
 
   @Test
-  public void shouldFocus() throws Exception {
-    final Transcript transcript = new Transcript();
+  public void shouldFocus() {
+    final List<String> transcript = new ArrayList<>();
 
-    view.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-      @Override
-      public void onFocusChange(View v, boolean hasFocus) {
-        transcript.add(hasFocus ? "Gained focus" : "Lost focus");
-      }
-    });
+    view.setOnFocusChangeListener(
+        (v, hasFocus) -> transcript.add(hasFocus ? "Gained focus" : "Lost focus"));
 
     assertFalse(view.isFocused());
     assertFalse(view.hasFocus());
-    transcript.assertNoEventsSoFar();
+    assertThat(transcript).isEmpty();
 
     view.requestFocus();
     assertFalse(view.isFocused());
     assertFalse(view.hasFocus());
-    transcript.assertNoEventsSoFar();
+    assertThat(transcript).isEmpty();
 
     view.setFocusable(true);
+    shadowMainLooper().idle();
     view.requestFocus();
     assertTrue(view.isFocused());
     assertTrue(view.hasFocus());
-    transcript.assertEventsSoFar("Gained focus");
+    assertThat(transcript).containsExactly("Gained focus");
+    transcript.clear();
 
-    shadowOf(view).setMyParent(new LinearLayout(RuntimeEnvironment.application)); // we can never lose focus unless a parent can take it
-
+    // take it
     view.clearFocus();
+    shadowMainLooper().idle();
     assertFalse(view.isFocused());
     assertFalse(view.hasFocus());
-    transcript.assertEventsSoFar("Lost focus");
+    assertThat(transcript).containsExactly("Lost focus");
   }
 
   @Test
-  public void shouldNotBeFocusableByDefault() throws Exception {
+  public void shouldNotBeFocusableByDefault() {
     assertFalse(view.isFocusable());
 
     view.setFocusable(true);
@@ -150,16 +185,14 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldKnowIfThisOrAncestorsAreVisible() throws Exception {
-    assertThat(view.isShown()).describedAs("view isn't considered shown unless it has a view root").isFalse();
-    shadowOf(view).setMyParent(new StubViewRoot());
+  public void shouldKnowIfThisOrAncestorsAreVisible() {
     assertThat(view.isShown()).isTrue();
     shadowOf(view).setMyParent(null);
 
-    ViewGroup parent = new LinearLayout(RuntimeEnvironment.application);
+    ViewGroup parent = new LinearLayout(context);
     parent.addView(view);
 
-    ViewGroup grandParent = new LinearLayout(RuntimeEnvironment.application);
+    ViewGroup grandParent = new LinearLayout(context);
     grandParent.addView(parent);
 
     grandParent.setVisibility(View.GONE);
@@ -168,9 +201,9 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldInflateMergeRootedLayoutAndNotCreateReferentialLoops() throws Exception {
-    LinearLayout root = new LinearLayout(RuntimeEnvironment.application);
-    LinearLayout.inflate(RuntimeEnvironment.application, R.layout.inner_merge, root);
+  public void shouldInflateMergeRootedLayoutAndNotCreateReferentialLoops() {
+    LinearLayout root = new LinearLayout(context);
+    LinearLayout.inflate(context, R.layout.inner_merge, root);
     for (int i = 0; i < root.getChildCount(); i++) {
       View child = root.getChildAt(i);
       assertNotSame(root, child);
@@ -178,28 +211,27 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void performLongClick_shouldClickOnView() throws Exception {
-    TestOnLongClickListener clickListener = new TestOnLongClickListener();
+  public void performLongClick_shouldClickOnView() {
+    OnLongClickListener clickListener = mock(OnLongClickListener.class);
     view.setOnLongClickListener(clickListener);
     view.performLongClick();
 
-    assertTrue(clickListener.clicked);
+    verify(clickListener).onLongClick(view);
   }
 
   @Test
-  public void checkedClick_shouldClickOnView() throws Exception {
-    TestOnClickListener clickListener = new TestOnClickListener();
-    shadowOf(view).setMyParent(new StubViewRoot());
+  public void checkedClick_shouldClickOnView() {
+    OnClickListener clickListener = mock(OnClickListener.class);
     view.setOnClickListener(clickListener);
     shadowOf(view).checkedPerformClick();
 
-    assertTrue(clickListener.clicked);
+    verify(clickListener).onClick(view);
   }
 
   @Test(expected = RuntimeException.class)
-  public void checkedClick_shouldThrowIfViewIsNotVisible() throws Exception {
-    ViewGroup grandParent = new LinearLayout(RuntimeEnvironment.application);
-    ViewGroup parent = new LinearLayout(RuntimeEnvironment.application);
+  public void checkedClick_shouldThrowIfViewIsNotVisible() {
+    ViewGroup grandParent = new LinearLayout(context);
+    ViewGroup parent = new LinearLayout(context);
     grandParent.addView(parent);
     parent.addView(view);
     grandParent.setVisibility(View.GONE);
@@ -208,24 +240,13 @@ public class ShadowViewTest {
   }
 
   @Test(expected = RuntimeException.class)
-  public void checkedClick_shouldThrowIfViewIsDisabled() throws Exception {
+  public void checkedClick_shouldThrowIfViewIsDisabled() {
     view.setEnabled(false);
     shadowOf(view).checkedPerformClick();
   }
 
-  /* 
-   * This test will throw an exception because the accessibility checks depend on the  Android
-   * Support Library. If the support library is included at some point, a single test from
-   * AccessibilityUtilTest could be moved here to make sure the accessibility checking is run.
-   */
-  @Test(expected = RuntimeException.class)
-  @AccessibilityChecks
-  public void checkedClick_withA11yChecksAnnotation_shouldThrow() throws Exception {
-    shadowOf(view).checkedPerformClick();
-  }
-
   @Test
-  public void getBackground_shouldReturnNullIfNoBackgroundHasBeenSet() throws Exception {
+  public void getBackground_shouldReturnNullIfNoBackgroundHasBeenSet() {
     assertThat(view.getBackground()).isNull();
   }
 
@@ -233,22 +254,22 @@ public class ShadowViewTest {
   public void shouldSetBackgroundColor() {
     int red = 0xffff0000;
     view.setBackgroundColor(red);
-    assertThat((ColorDrawable) view.getBackground()).isEqualTo(new ColorDrawable(red));
+    ColorDrawable background = (ColorDrawable) view.getBackground();
+    assertThat(background.getColor()).isEqualTo(red);
   }
 
   @Test
-  public void shouldSetBackgroundResource() throws Exception {
+  public void shouldSetBackgroundResource() {
     view.setBackgroundResource(R.drawable.an_image);
-    assertThat(view.getBackground()).isEqualTo(view.getResources().getDrawable(R.drawable.an_image));
-    assertThat(shadowOf(view).getBackgroundResourceId()).isEqualTo(R.drawable.an_image);
+    assertThat(shadowOf((BitmapDrawable) view.getBackground()).getCreatedFromResId())
+        .isEqualTo(R.drawable.an_image);
   }
 
   @Test
-  public void shouldClearBackgroundResource() throws Exception {
+  public void shouldClearBackgroundResource() {
     view.setBackgroundResource(R.drawable.an_image);
     view.setBackgroundResource(0);
     assertThat(view.getBackground()).isEqualTo(null);
-    assertThat(shadowOf(view).getBackgroundResourceId()).isEqualTo(-1);
   }
 
   @Test
@@ -257,7 +278,8 @@ public class ShadowViewTest {
 
     for (int color : colors) {
       view.setBackgroundColor(color);
-      assertThat(shadowOf(view).getBackgroundColor()).isEqualTo(color);
+      ColorDrawable drawable = (ColorDrawable) view.getBackground();
+      assertThat(drawable.getColor()).isEqualTo(color);
     }
   }
 
@@ -265,62 +287,64 @@ public class ShadowViewTest {
   public void shouldRecordBackgroundDrawable() {
     Drawable drawable = new BitmapDrawable(BitmapFactory.decodeFile("some/fake/file"));
     view.setBackgroundDrawable(drawable);
-    assertThat(view.getBackground()).isSameAs(drawable);
+    assertThat(view.getBackground()).isSameInstanceAs(drawable);
     assertThat(ShadowView.visualize(view)).isEqualTo("background:\nBitmap for file:some/fake/file");
   }
 
   @Test
-  public void shouldPostActionsToTheMessageQueue() throws Exception {
-    ShadowLooper.pauseMainLooper();
+  public void shouldPostActionsToTheMessageQueue() {
+    shadowMainLooper().pause();
 
     TestRunnable runnable = new TestRunnable();
-    view.post(runnable);
+    assertThat(view.post(runnable)).isTrue();
     assertFalse(runnable.wasRun);
 
-    ShadowLooper.unPauseMainLooper();
+    shadowMainLooper().idle();
     assertTrue(runnable.wasRun);
   }
 
   @Test
-  public void shouldPostInvalidateDelayed() throws Exception {
-    ShadowLooper.pauseMainLooper();
-
-    view.postInvalidateDelayed(100);
+  public void shouldPostInvalidateDelayed() {
+    shadowMainLooper().pause();
     ShadowView shadowView = shadowOf(view);
+    shadowView.clearWasInvalidated();
     assertFalse(shadowView.wasInvalidated());
 
-    ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+    view.postInvalidateDelayed(1);
+    assertFalse(shadowView.wasInvalidated());
+
+    shadowMainLooper().idleFor(Duration.ofMillis(1));
     assertTrue(shadowView.wasInvalidated());
   }
 
   @Test
-  public void shouldPostActionsToTheMessageQueueWithDelay() throws Exception {
-    ShadowLooper.pauseMainLooper();
+  public void shouldPostActionsToTheMessageQueueWithDelay() {
+    shadowMainLooper().pause();
 
     TestRunnable runnable = new TestRunnable();
     view.postDelayed(runnable, 1);
     assertFalse(runnable.wasRun);
 
-    Robolectric.getForegroundThreadScheduler().advanceBy(1);
+    shadowMainLooper().idleFor(Duration.ofMillis(1));
     assertTrue(runnable.wasRun);
   }
 
   @Test
-  public void shouldRemovePostedCallbacksFromMessageQueue() throws Exception {
+  public void shouldRemovePostedCallbacksFromMessageQueue() {
     TestRunnable runnable = new TestRunnable();
-    view.postDelayed(runnable, 1);
+    assertThat(view.postDelayed(runnable, 1)).isTrue();
 
-    view.removeCallbacks(runnable);
+    assertThat(view.removeCallbacks(runnable)).isTrue();
 
-    Robolectric.getForegroundThreadScheduler().advanceBy(1);
+    shadowMainLooper().idleFor(Duration.ofMillis(1));
     assertThat(runnable.wasRun).isFalse();
   }
 
   @Test
-  public void shouldSupportAllConstructors() throws Exception {
-    new View(RuntimeEnvironment.application);
-    new View(RuntimeEnvironment.application, null);
-    new View(RuntimeEnvironment.application, null, 0);
+  public void shouldSupportAllConstructors() {
+    new View(context);
+    new View(context, null);
+    new View(context, null, 0);
   }
 
   @Test
@@ -332,23 +356,22 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldAddOnClickListenerFromAttribute() throws Exception {
-    AttributeSet attrs = Robolectric.buildAttributeSet()
-        .addAttribute(android.R.attr.onClick, "clickMe")
-        .build()
-        ;
+  @ResourcesMode(ResourcesMode.Mode.BINARY)
+  public void shouldAddOnClickListenerFromAttribute() {
+    AttributeSet attrs =
+        Robolectric.buildAttributeSet().addAttribute(android.R.attr.onClick, "clickMe").build();
 
-    view = new View(RuntimeEnvironment.application, attrs);
+    view = new View(context, attrs);
     assertNotNull(shadowOf(view).getOnClickListener());
   }
 
   @Test
-  public void shouldCallOnClickWithAttribute() throws Exception {
+  @ResourcesMode(ResourcesMode.Mode.BINARY)
+  public void shouldCallOnClickWithAttribute() {
     MyActivity myActivity = buildActivity(MyActivity.class).create().get();
 
-    AttributeSet attrs = Robolectric.buildAttributeSet()
-        .addAttribute(android.R.attr.onClick, "clickMe")
-        .build();
+    AttributeSet attrs =
+        Robolectric.buildAttributeSet().addAttribute(android.R.attr.onClick, "clickMe").build();
 
     view = new View(myActivity, attrs);
     view.performClick();
@@ -356,42 +379,81 @@ public class ShadowViewTest {
   }
 
   @Test(expected = RuntimeException.class)
-  public void shouldThrowExceptionWithBadMethodName() throws Exception {
+  public void shouldThrowExceptionWithBadMethodName() {
     MyActivity myActivity = buildActivity(MyActivity.class).create().get();
 
-    AttributeSet attrs = Robolectric.buildAttributeSet()
-        .addAttribute(android.R.attr.onClick, "clickYou")
-        .build();
+    AttributeSet attrs =
+        Robolectric.buildAttributeSet().addAttribute(android.R.attr.onClick, "clickYou").build();
 
     view = new View(myActivity, attrs);
     view.performClick();
   }
 
   @Test
-  public void shouldSetAnimation() throws Exception {
+  public void shouldSetAnimation() {
     Animation anim = new TestAnimation();
     view.setAnimation(anim);
-    assertThat(view.getAnimation()).isSameAs(anim);
+    assertThat(view.getAnimation()).isSameInstanceAs(anim);
+  }
+
+  @Test
+  public void clearAnimation_cancelsAnimation() {
+    AtomicInteger numTicks = new AtomicInteger();
+    final Animation anim =
+        new Animation() {
+          @Override
+          protected void applyTransformation(float interpolatedTime, Transformation t) {
+            super.applyTransformation(interpolatedTime, t);
+            numTicks.incrementAndGet();
+          }
+        };
+    anim.setDuration(Duration.ofSeconds(1).toMillis());
+    view.setAnimation(anim);
+    view.clearAnimation();
+    shadowOf(Looper.getMainLooper()).runToEndOfTasks();
+    assertThat(numTicks.get()).isEqualTo(0);
   }
 
   @Test
   public void shouldFindViewWithTag() {
     view.setTag("tagged");
-    assertThat(view.findViewWithTag("tagged")).isSameAs(view);
+    assertThat((View) view.findViewWithTag("tagged")).isSameInstanceAs(view);
   }
 
   @Test
-  public void scrollTo_shouldStoreTheScrolledCoordinates() throws Exception {
-    view.scrollTo(1, 2);
-    assertThat(shadowOf(view).scrollToCoordinates).isEqualTo(new Point(1, 2));
+  public void scrollTo_shouldStoreTheScrolledCoordinates() {
+    // This test depends on broken scrolling behavior.
+    System.setProperty("robolectric.useRealScrolling", "false");
+    try {
+      view.scrollTo(1, 2);
+      assertThat(shadowOf(view).scrollToCoordinates).isEqualTo(new Point(1, 2));
+    } finally {
+      System.clearProperty("robolectric.useRealScrolling");
+    }
   }
 
   @Test
-  public void shouldScrollTo() throws Exception {
+  public void shouldScrollTo() {
     view.scrollTo(7, 6);
 
     assertEquals(7, view.getScrollX());
     assertEquals(6, view.getScrollY());
+  }
+
+  @Test
+  public void scrollBy_shouldStoreTheScrolledCoordinates() {
+    // This test depends on broken scrolling behavior.
+    System.setProperty("robolectric.useRealScrolling", "false");
+    try {
+      view.scrollTo(4, 5);
+      view.scrollBy(10, 20);
+      assertThat(shadowOf(view).scrollToCoordinates).isEqualTo(new Point(14, 25));
+
+      assertThat(view.getScrollX()).isEqualTo(14);
+      assertThat(view.getScrollY()).isEqualTo(25);
+    } finally {
+      System.clearProperty("robolectric.useRealScrolling");
+    }
   }
 
   @Test
@@ -401,39 +463,38 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void getViewTreeObserver_shouldReturnTheSameObserverFromMultipleCalls() throws Exception {
+  public void getViewTreeObserver_shouldReturnTheSameObserverFromMultipleCalls() {
     ViewTreeObserver observer = view.getViewTreeObserver();
     assertThat(observer).isInstanceOf(ViewTreeObserver.class);
-    assertThat(view.getViewTreeObserver()).isSameAs(observer);
+    assertThat(view.getViewTreeObserver()).isSameInstanceAs(observer);
   }
 
   @Test
-  public void dispatchTouchEvent_sendsMotionEventToOnTouchEvent() throws Exception {
-    TouchableView touchableView = new TouchableView(RuntimeEnvironment.application);
+  public void dispatchTouchEvent_sendsMotionEventToOnTouchEvent() {
+    TouchableView touchableView = new TouchableView(context);
     MotionEvent event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 12f, 34f, 0);
     touchableView.dispatchTouchEvent(event);
-    assertThat(touchableView.event).isSameAs(event);
+    assertThat(touchableView.event).isSameInstanceAs(event);
     view.dispatchTouchEvent(event);
-    assertThat(shadowOf(view).getLastTouchEvent()).isSameAs(event);
+    assertThat(shadowOf(view).getLastTouchEvent()).isSameInstanceAs(event);
   }
 
   @Test
-  public void dispatchTouchEvent_listensToFalseFromListener() throws Exception {
+  public void dispatchTouchEvent_listensToFalseFromListener() {
     final AtomicBoolean called = new AtomicBoolean(false);
-    view.setOnTouchListener(new View.OnTouchListener() {
-      @Override
-      public boolean onTouch(View view, MotionEvent motionEvent) {
-        called.set(true); return false;
-      }
-    });
+    view.setOnTouchListener(
+        (view, motionEvent) -> {
+          called.set(true);
+          return false;
+        });
     MotionEvent event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 12f, 34f, 0);
     view.dispatchTouchEvent(event);
-    assertThat(shadowOf(view).getLastTouchEvent()).isSameAs(event);
+    assertThat(shadowOf(view).getLastTouchEvent()).isSameInstanceAs(event);
     assertThat(called.get()).isTrue();
   }
 
   @Test
-  public void test_nextFocusDownId() throws Exception {
+  public void test_nextFocusDownId() {
     assertEquals(View.NO_ID, view.getNextFocusDownId());
 
     view.setNextFocusDownId(R.id.icon);
@@ -442,20 +503,22 @@ public class ShadowViewTest {
 
   @Test
   public void startAnimation() {
-    TestView view = new TestView(buildActivity(Activity.class).create().get());
     AlphaAnimation animation = new AlphaAnimation(0, 1);
-
     Animation.AnimationListener listener = mock(Animation.AnimationListener.class);
     animation.setAnimationListener(listener);
+
     view.startAnimation(animation);
+    shadowMainLooper().idle();
 
     verify(listener).onAnimationStart(animation);
     verify(listener).onAnimationEnd(animation);
+    assertThat(animation.isInitialized()).isTrue();
+    assertThat(view.getAnimation()).isNull();
+    assertThat(shadowOf(view).getAnimations()).contains(animation);
   }
 
   @Test
   public void setAnimation() {
-    TestView view = new TestView(buildActivity(Activity.class).create().get());
     AlphaAnimation animation = new AlphaAnimation(0, 1);
 
     Animation.AnimationListener listener = mock(Animation.AnimationListener.class);
@@ -463,9 +526,10 @@ public class ShadowViewTest {
     animation.setStartTime(1000);
     view.setAnimation(animation);
 
-    verifyZeroInteractions(listener);
+    verifyNoMoreInteractions(listener);
 
-    Robolectric.getForegroundThreadScheduler().advanceToNextPostedRunnable();
+    SystemClock.setCurrentTimeMillis(1000);
+    shadowMainLooper().idle();
 
     verify(listener).onAnimationStart(animation);
     verify(listener).onAnimationEnd(animation);
@@ -488,7 +552,8 @@ public class ShadowViewTest {
     assertThat(view1.getMeasuredHeight()).isEqualTo(0);
     assertThat(view1.getMeasuredWidth()).isEqualTo(0);
 
-    view1.measure(MeasureSpec.makeMeasureSpec(150, MeasureSpec.AT_MOST),
+    view1.measure(
+        MeasureSpec.makeMeasureSpec(150, MeasureSpec.AT_MOST),
         MeasureSpec.makeMeasureSpec(300, MeasureSpec.AT_MOST));
 
     assertThat(view1.getHeight()).isEqualTo(0);
@@ -507,8 +572,9 @@ public class ShadowViewTest {
     assertThat(view2.getMeasuredWidth()).isEqualTo(0);
     assertThat(view2.getMeasuredHeight()).isEqualTo(0);
 
-    view2.measure(MeasureSpec.makeMeasureSpec(200, MeasureSpec.AT_MOST),
-    MeasureSpec.makeMeasureSpec(50, MeasureSpec.AT_MOST));
+    view2.measure(
+        MeasureSpec.makeMeasureSpec(200, MeasureSpec.AT_MOST),
+        MeasureSpec.makeMeasureSpec(50, MeasureSpec.AT_MOST));
 
     assertThat(view2.getWidth()).isEqualTo(0);
     assertThat(view2.getHeight()).isEqualTo(0);
@@ -517,7 +583,7 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldGetAndSetTranslations() throws Exception {
+  public void shouldGetAndSetTranslations() {
     view = new TestView(buildActivity(Activity.class).create().get());
     view.setTranslationX(8.9f);
     view.setTranslationY(4.6f);
@@ -527,7 +593,7 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldGetAndSetAlpha() throws Exception {
+  public void shouldGetAndSetAlpha() {
     view = new TestView(buildActivity(Activity.class).create().get());
     view.setAlpha(9.1f);
 
@@ -536,7 +602,6 @@ public class ShadowViewTest {
 
   @Test
   public void itKnowsIfTheViewIsShown() {
-    shadowOf(view).setMyParent(new StubViewRoot()); // a view is only considered visible if it is added to a view root
     view.setVisibility(View.VISIBLE);
     assertThat(view.isShown()).isTrue();
   }
@@ -551,7 +616,8 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void shouldTrackRequestLayoutCalls() throws Exception {
+  public void shouldTrackRequestLayoutCalls() {
+    shadowOf(view).setDidRequestLayout(false);
     assertThat(shadowOf(view).didRequestLayout()).isFalse();
     view.requestLayout();
     assertThat(shadowOf(view).didRequestLayout()).isTrue();
@@ -559,34 +625,25 @@ public class ShadowViewTest {
     assertThat(shadowOf(view).didRequestLayout()).isFalse();
   }
 
-  public void shouldClickAndNotClick() throws Exception {
+  @Test
+  public void shouldClickAndNotClick() {
     assertThat(view.isClickable()).isFalse();
     view.setClickable(true);
     assertThat(view.isClickable()).isTrue();
     view.setClickable(false);
     assertThat(view.isClickable()).isFalse();
-    view.setOnClickListener(new OnClickListener() {
-      @Override
-      public void onClick(View v) {
-        ;
-      }
-    });
+    view.setOnClickListener(v -> {});
     assertThat(view.isClickable()).isTrue();
   }
 
   @Test
-  public void shouldLongClickAndNotLongClick() throws Exception {
+  public void shouldLongClickAndNotLongClick() {
     assertThat(view.isLongClickable()).isFalse();
     view.setLongClickable(true);
     assertThat(view.isLongClickable()).isTrue();
     view.setLongClickable(false);
     assertThat(view.isLongClickable()).isFalse();
-    view.setOnLongClickListener(new OnLongClickListener() {
-      @Override
-      public boolean onLongClick(View v) {
-        return false;
-      }
-    });
+    view.setOnLongClickListener(v -> false);
     assertThat(view.isLongClickable()).isTrue();
   }
 
@@ -609,7 +666,6 @@ public class ShadowViewTest {
   }
 
   @Test
-  @Config(sdk = { Build.VERSION_CODES.LOLLIPOP })
   public void cameraDistance() {
     view.setCameraDistance(100f);
     assertThat(view.getCameraDistance()).isEqualTo(100f);
@@ -642,7 +698,6 @@ public class ShadowViewTest {
   }
 
   @Test
-  @Config(sdk = { Build.VERSION_CODES.LOLLIPOP })
   public void elevation() {
     view.setElevation(10f);
     assertThat(view.getElevation()).isEqualTo(10f);
@@ -661,36 +716,35 @@ public class ShadowViewTest {
   }
 
   @Test
-  @Config(sdk = { Build.VERSION_CODES.LOLLIPOP })
   public void translationZ() {
     view.setTranslationZ(10f);
     assertThat(view.getTranslationZ()).isEqualTo(10f);
   }
 
   @Test
-  @Config(sdk = { Build.VERSION_CODES.LOLLIPOP })
   public void clipToOutline() {
     view.setClipToOutline(true);
     assertThat(view.getClipToOutline()).isTrue();
   }
 
   @Test
-  public void performHapticFeedback_shouldSetLastPerformedHapticFeedback() throws Exception {
+  public void performHapticFeedback_shouldSetLastPerformedHapticFeedback() {
     assertThat(shadowOf(view).lastHapticFeedbackPerformed()).isEqualTo(-1);
     view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-    assertThat(shadowOf(view).lastHapticFeedbackPerformed()).isEqualTo(HapticFeedbackConstants.LONG_PRESS);
+    assertThat(shadowOf(view).lastHapticFeedbackPerformed())
+        .isEqualTo(HapticFeedbackConstants.LONG_PRESS);
   }
 
   @Test
-  public void canAssertThatSuperDotOnLayoutWasCalledFromViewSubclasses() throws Exception {
-    TestView2 view = new TestView2(buildActivity(Activity.class).create().get(), 1111, 1112);
+  public void canAssertThatSuperDotOnLayoutWasCalledFromViewSubclasses() {
+    TestView2 view = new TestView2(setupActivity(Activity.class), 1111, 1112);
     assertThat(shadowOf(view).onLayoutWasCalled()).isFalse();
     view.onLayout(true, 1, 2, 3, 4);
     assertThat(shadowOf(view).onLayoutWasCalled()).isTrue();
   }
 
   @Test
-  public void setScrolls_canBeAskedFor() throws Exception {
+  public void setScrolls_canBeAskedFor() {
     view.setScrollX(234);
     view.setScrollY(544);
     assertThat(view.getScrollX()).isEqualTo(234);
@@ -698,7 +752,7 @@ public class ShadowViewTest {
   }
 
   @Test
-  public void setScrolls_firesOnScrollChanged() throws Exception {
+  public void setScrolls_firesOnScrollChanged() {
     TestView testView = new TestView(buildActivity(Activity.class).create().get());
     testView.setScrollX(122);
     testView.setScrollY(150);
@@ -710,8 +764,14 @@ public class ShadowViewTest {
     assertThat(testView.oldt).isEqualTo(150);
   }
 
-  private static class TestAnimation extends Animation {
+  @Test
+  public void layerType() {
+    assertThat(view.getLayerType()).isEqualTo(View.LAYER_TYPE_NONE);
+    view.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+    assertThat(view.getLayerType()).isEqualTo(View.LAYER_TYPE_SOFTWARE);
   }
+
+  private static class TestAnimation extends Animation {}
 
   private static class TouchableView extends View {
     MotionEvent event;
@@ -755,8 +815,8 @@ public class ShadowViewTest {
 
   private static class TestView2 extends View {
 
-    private int minWidth;
-    private int minHeight;
+    private final int minWidth;
+    private final int minHeight;
 
     public TestView2(Context context, int minWidth, int minHeight) {
       super(context);
@@ -769,77 +829,307 @@ public class ShadowViewTest {
       super.onLayout(changed, l, t, r, b);
     }
 
-    @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
       setMeasuredDimension(minWidth, minHeight);
     }
   }
 
   @Test
-  public void shouldCallOnAttachedToAndDetachedFromWindow() throws Exception {
+  public void shouldCallOnAttachedToAndDetachedFromWindow() {
     MyView parent = new MyView("parent", transcript);
     parent.addView(new MyView("child", transcript));
-    transcript.assertNoEventsSoFar();
+    assertThat(transcript).isEmpty();
 
-    Activity activity = Robolectric.buildActivity(ContentViewActivity.class).create().get();
+    Activity activity = buildActivity(ContentViewActivity.class).setup().get();
     activity.getWindowManager().addView(parent, new WindowManager.LayoutParams(100, 100));
-    transcript.assertEventsSoFar("parent attached", "child attached");
+    shadowMainLooper().idle();
+    assertThat(transcript).containsExactly("parent attached", "child attached");
+    transcript.clear();
 
     parent.addView(new MyView("another child", transcript));
-    transcript.assertEventsSoFar("another child attached");
+    assertThat(transcript).containsExactly("another child attached");
+    transcript.clear();
 
     MyView temporaryChild = new MyView("temporary child", transcript);
     parent.addView(temporaryChild);
-    transcript.assertEventsSoFar("temporary child attached");
+    assertThat(transcript).containsExactly("temporary child attached");
+    transcript.clear();
     assertTrue(shadowOf(temporaryChild).isAttachedToWindow());
 
     parent.removeView(temporaryChild);
-    transcript.assertEventsSoFar("temporary child detached");
+    assertThat(transcript).containsExactly("temporary child detached");
     assertFalse(shadowOf(temporaryChild).isAttachedToWindow());
+  }
+
+  @Test
+  public void getWindowId_shouldReturnValidObjectWhenAttached() {
+    MyView parent = new MyView("parent", transcript);
+    MyView child = new MyView("child", transcript);
+    parent.addView(child);
+
+    assertThat(parent.getWindowId()).isNull();
+    assertThat(child.getWindowId()).isNull();
+
+    Activity activity = buildActivity(ContentViewActivity.class).create().get();
+    activity.getWindowManager().addView(parent, new WindowManager.LayoutParams(100, 100));
+    shadowMainLooper().idle();
+
+    WindowId windowId = parent.getWindowId();
+    assertThat(windowId).isNotNull();
+    assertThat(child.getWindowId()).isSameInstanceAs(windowId);
+    assertThat(child.getWindowId()).isEqualTo(windowId); // equals must work!
+
+    MyView anotherChild = new MyView("another child", transcript);
+    parent.addView(anotherChild);
+    assertThat(anotherChild.getWindowId()).isEqualTo(windowId);
+
+    parent.removeView(anotherChild);
+    assertThat(anotherChild.getWindowId()).isNull();
   }
 
   // todo looks like this is flaky...
   @Test
-  public void removeAllViews_shouldCallOnAttachedToAndDetachedFromWindow() throws Exception {
+  public void removeAllViews_shouldCallOnAttachedToAndDetachedFromWindow() {
     MyView parent = new MyView("parent", transcript);
-    Activity activity = Robolectric.buildActivity(ContentViewActivity.class).create().get();
+    Activity activity = buildActivity(ContentViewActivity.class).create().get();
     activity.getWindowManager().addView(parent, new WindowManager.LayoutParams(100, 100));
 
     parent.addView(new MyView("child", transcript));
     parent.addView(new MyView("another child", transcript));
-    ShadowLooper.runUiThreadTasks();
+    shadowMainLooper().idle();
     transcript.clear();
     parent.removeAllViews();
-    ShadowLooper.runUiThreadTasks();
-    transcript.assertEventsSoFar("another child detached", "child detached");
+    shadowMainLooper().idle();
+    assertThat(transcript).containsExactly("another child detached", "child detached");
   }
 
   @Test
-  public void capturesOnSystemUiVisibilityChangeListener() throws Exception {
+  public void capturesOnSystemUiVisibilityChangeListener() {
     TestView testView = new TestView(buildActivity(Activity.class).create().get());
-    View.OnSystemUiVisibilityChangeListener changeListener = new View.OnSystemUiVisibilityChangeListener() {
-      @Override
-      public void onSystemUiVisibilityChange(int i) { }
-    };
+    View.OnSystemUiVisibilityChangeListener changeListener =
+        new View.OnSystemUiVisibilityChangeListener() {
+          @Override
+          public void onSystemUiVisibilityChange(int i) {}
+        };
     testView.setOnSystemUiVisibilityChangeListener(changeListener);
 
-    assertThat(changeListener).isEqualTo(shadowOf(testView).getOnSystemUiVisibilityChangeListener());
+    assertThat(changeListener)
+        .isEqualTo(shadowOf(testView).getOnSystemUiVisibilityChangeListener());
   }
 
   @Test
-  public void capturesOnCreateContextMenuListener() throws Exception {
+  public void capturesOnCreateContextMenuListener() {
     TestView testView = new TestView(buildActivity(Activity.class).create().get());
     assertThat(shadowOf(testView).getOnCreateContextMenuListener()).isNull();
 
-    View.OnCreateContextMenuListener createListener = new View.OnCreateContextMenuListener() {
-      @Override
-      public void onCreateContextMenu(ContextMenu contextMenu, View view, ContextMenu.ContextMenuInfo contextMenuInfo) {}
-    };
+    View.OnCreateContextMenuListener createListener =
+        new View.OnCreateContextMenuListener() {
+          @Override
+          public void onCreateContextMenu(
+              ContextMenu contextMenu, View view, ContextMenu.ContextMenuInfo contextMenuInfo) {}
+        };
 
     testView.setOnCreateContextMenuListener(createListener);
     assertThat(shadowOf(testView).getOnCreateContextMenuListener()).isEqualTo(createListener);
 
     testView.setOnCreateContextMenuListener(null);
     assertThat(shadowOf(testView).getOnCreateContextMenuListener()).isNull();
+  }
+
+  @Test
+  public void capturesOnAttachStateChangeListeners() throws Exception {
+    TestView testView = new TestView(buildActivity(Activity.class).create().get());
+    assertThat(shadowOf(testView).getOnAttachStateChangeListeners()).isEmpty();
+
+    View.OnAttachStateChangeListener attachListener1 =
+        new View.OnAttachStateChangeListener() {
+          @Override
+          public void onViewAttachedToWindow(@Nonnull View v) {}
+
+          @Override
+          public void onViewDetachedFromWindow(@Nonnull View v) {}
+        };
+
+    View.OnAttachStateChangeListener attachListener2 =
+        new View.OnAttachStateChangeListener() {
+          @Override
+          public void onViewAttachedToWindow(@Nonnull View v) {}
+
+          @Override
+          public void onViewDetachedFromWindow(@Nonnull View v) {}
+        };
+
+    testView.addOnAttachStateChangeListener(attachListener1);
+    assertThat(shadowOf(testView).getOnAttachStateChangeListeners())
+        .containsExactly(attachListener1);
+
+    testView.addOnAttachStateChangeListener(attachListener2);
+    assertThat(shadowOf(testView).getOnAttachStateChangeListeners())
+        .containsExactly(attachListener1, attachListener2);
+
+    testView.removeOnAttachStateChangeListener(attachListener2);
+    assertThat(shadowOf(testView).getOnAttachStateChangeListeners())
+        .containsExactly(attachListener1);
+
+    testView.removeOnAttachStateChangeListener(attachListener1);
+    assertThat(shadowOf(testView).getOnAttachStateChangeListeners()).isEmpty();
+  }
+
+  @Test
+  public void setsGlobalVisibleRect() {
+    Rect globalVisibleRect = new Rect();
+    shadowOf(view).setGlobalVisibleRect(new Rect());
+    assertThat(view.getGlobalVisibleRect(globalVisibleRect)).isFalse();
+    assertThat(globalVisibleRect.isEmpty()).isTrue();
+    assertThat(view.getGlobalVisibleRect(globalVisibleRect, new Point(1, 1))).isFalse();
+    assertThat(globalVisibleRect.isEmpty()).isTrue();
+
+    shadowOf(view).setGlobalVisibleRect(new Rect(1, 2, 3, 4));
+    assertThat(view.getGlobalVisibleRect(globalVisibleRect)).isTrue();
+    assertThat(globalVisibleRect).isEqualTo(new Rect(1, 2, 3, 4));
+    assertThat(view.getGlobalVisibleRect(globalVisibleRect, new Point(1, 1))).isTrue();
+    assertThat(globalVisibleRect).isEqualTo(new Rect(0, 1, 2, 3));
+  }
+
+  @Test
+  public void usesDefaultGlobalVisibleRect() {
+
+    final ActivityController<Activity> activityController = buildActivity(Activity.class);
+    final Activity activity = activityController.get();
+    TextView fooView = new TextView(activity);
+    activity.setContentView(
+        fooView,
+        new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    activityController.setup();
+
+    Rect globalVisibleRect = new Rect();
+    assertThat(fooView.getGlobalVisibleRect(globalVisibleRect)).isTrue();
+    assertThat(globalVisibleRect)
+        .isEqualTo(
+            new Rect(
+                0,
+                25,
+                DeviceConfig.DEFAULT_SCREEN_SIZE.width,
+                DeviceConfig.DEFAULT_SCREEN_SIZE.height));
+  }
+
+  @Test
+  public void performClick_addListener_sendsGlobalViewAction() {
+    class GlobalListener implements View.OnClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public void onClick(View view) {
+        receivedEvent = true;
+      }
+    }
+    GlobalListener listener = new GlobalListener();
+
+    ShadowView.addGlobalPerformClickListener(listener);
+    view.performClick();
+
+    assertThat(listener.receivedEvent).isTrue();
+  }
+
+  @Test
+  public void performClick_removeListener_sendsGlobalViewAction() {
+    class GlobalListener implements View.OnClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public void onClick(View view) {
+        receivedEvent = true;
+      }
+    }
+    GlobalListener listener = new GlobalListener();
+
+    ShadowView.addGlobalPerformClickListener(listener);
+    ShadowView.removeGlobalPerformClickListener(listener);
+    view.performClick();
+
+    assertThat(listener.receivedEvent).isFalse();
+  }
+
+  @Test
+  public void performLongClick_addListener_sendsGlobalViewAction() {
+    class GlobalListener implements View.OnLongClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public boolean onLongClick(View view) {
+        receivedEvent = true;
+        return true;
+      }
+    }
+    GlobalListener listener = new GlobalListener();
+
+    ShadowView.addGlobalPerformLongClickListener(listener);
+    view.performLongClick();
+
+    assertThat(listener.receivedEvent).isTrue();
+  }
+
+  @Test
+  public void performLongClick_removeListener_sendsGlobalViewAction() {
+    class GlobalListener implements View.OnLongClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public boolean onLongClick(View view) {
+        receivedEvent = true;
+        return true;
+      }
+    }
+    GlobalListener listener = new GlobalListener();
+
+    ShadowView.addGlobalPerformLongClickListener(listener);
+    ShadowView.removeGlobalPerformLongClickListener(listener);
+    view.performLongClick();
+
+    assertThat(listener.receivedEvent).isFalse();
+  }
+
+  @Test
+  public void reset_removesAllGlobalViewActionListeners() {
+    class GlobalClickListener implements View.OnClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public void onClick(View view) {
+        receivedEvent = true;
+      }
+    }
+    class GlobalLongClickListener implements View.OnLongClickListener {
+      boolean receivedEvent = false;
+
+      @Override
+      public boolean onLongClick(View view) {
+        receivedEvent = true;
+        return true;
+      }
+    }
+    GlobalClickListener globalClickListener = new GlobalClickListener();
+    GlobalLongClickListener globalLongClickListener = new GlobalLongClickListener();
+
+    ShadowView.addGlobalPerformClickListener(globalClickListener);
+    ShadowView.addGlobalPerformLongClickListener(globalLongClickListener);
+
+    ShadowView.reset();
+
+    // Should call both listeners since this calls sendAccessibilityEvent.
+    view.performClick();
+
+    assertThat(globalClickListener.receivedEvent).isFalse();
+    assertThat(globalLongClickListener.receivedEvent).isFalse();
+  }
+
+  @Test
+  public void getSourceLayoutResId() {
+    View view = LayoutInflater.from(context).inflate(R.layout.edit_text, null, false);
+
+    assertThat(shadowOf(view).getSourceLayoutResId()).isEqualTo(R.layout.edit_text);
   }
 
   public static class MyActivity extends Activity {
@@ -852,21 +1142,23 @@ public class ShadowViewTest {
   }
 
   public static class MyView extends LinearLayout {
-    private String name;
-    private Transcript transcript;
+    private final String name;
+    private final List<String> transcript;
 
-    public MyView(String name, Transcript transcript) {
-      super(RuntimeEnvironment.application);
+    public MyView(String name, List<String> transcript) {
+      super(ApplicationProvider.getApplicationContext());
       this.name = name;
       this.transcript = transcript;
     }
 
-    @Override protected void onAttachedToWindow() {
+    @Override
+    protected void onAttachedToWindow() {
       transcript.add(name + " attached");
       super.onAttachedToWindow();
     }
 
-    @Override protected void onDetachedFromWindow() {
+    @Override
+    protected void onDetachedFromWindow() {
       transcript.add(name + " detached");
       super.onDetachedFromWindow();
     }

@@ -1,17 +1,20 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import javax.annotation.Nonnull;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static junit.framework.Assert.*;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowScaleGestureDetectorTest {
 
   private ScaleGestureDetector detector;
@@ -19,37 +22,42 @@ public class ShadowScaleGestureDetectorTest {
 
   @Before
   public void setUp() throws Exception {
-    detector = new ScaleGestureDetector(RuntimeEnvironment.application, null);
+    detector =
+        new ScaleGestureDetector(
+            ApplicationProvider.getApplicationContext(), new TestOnGestureListener());
     motionEvent = MotionEvent.obtain(-1, -1, MotionEvent.ACTION_UP, 100, 30, -1);
   }
 
   @Test
-  public void test_getOnTouchEventMotionEvent() throws Exception {
+  public void test_getOnTouchEventMotionEvent() {
     detector.onTouchEvent(motionEvent);
     assertSame(motionEvent, shadowOf(detector).getOnTouchEventMotionEvent());
   }
 
   @Test
-  public void test_getScaleFactor() throws Exception {
+  public void test_getScaleFactor() {
     shadowOf(detector).setScaleFactor(2.0f);
-    assertEquals(detector.getScaleFactor(), 2.0f);
+    assertThat(detector.getScaleFactor()).isEqualTo(2.0f);
   }
 
   @Test
-  public void test_getFocusXY() throws Exception {
+  public void test_getFocusXY() {
     shadowOf(detector).setFocusXY(2.0f, 3.0f);
-    assertEquals(detector.getFocusX(), 2.0f);
-    assertEquals(detector.getFocusY(), 3.0f);
+    assertThat(detector.getFocusX()).isEqualTo(2.0f);
+    assertThat(detector.getFocusY()).isEqualTo(3.0f);
   }
 
   @Test
-  public void test_getListener() throws Exception {
+  public void test_getListener() {
     TestOnGestureListener listener = new TestOnGestureListener();
-    assertSame(listener, shadowOf(new ScaleGestureDetector(RuntimeEnvironment.application, listener)).getListener());
+    assertSame(
+        listener,
+        shadowOf(new ScaleGestureDetector(ApplicationProvider.getApplicationContext(), listener))
+            .getListener());
   }
 
   @Test
-  public void test_reset() throws Exception {
+  public void test_reset() {
     assertDefaults();
 
     detector.onTouchEvent(motionEvent);
@@ -64,24 +72,24 @@ public class ShadowScaleGestureDetectorTest {
 
   private void assertDefaults() {
     assertNull(shadowOf(detector).getOnTouchEventMotionEvent());
-    assertEquals(detector.getScaleFactor(), 1f);
-    assertEquals(detector.getFocusX(), 0f);
-    assertEquals(detector.getFocusY(), 0f);
+    assertThat(detector.getScaleFactor()).isEqualTo(1f);
+    assertThat(detector.getFocusX()).isEqualTo(0f);
+    assertThat(detector.getFocusY()).isEqualTo(0f);
   }
 
-  private static class TestOnGestureListener implements ScaleGestureDetector.OnScaleGestureListener {
+  private static class TestOnGestureListener
+      implements ScaleGestureDetector.OnScaleGestureListener {
     @Override
-    public boolean onScale(ScaleGestureDetector detector) {
+    public boolean onScale(@Nonnull ScaleGestureDetector detector) {
       return false;
     }
 
     @Override
-    public boolean onScaleBegin(ScaleGestureDetector detector) {
+    public boolean onScaleBegin(@Nonnull ScaleGestureDetector detector) {
       return false;
     }
 
     @Override
-    public void onScaleEnd(ScaleGestureDetector detector) {
-    }
+    public void onScaleEnd(@Nonnull ScaleGestureDetector detector) {}
   }
 }

@@ -1,34 +1,33 @@
 package org.robolectric.shadows;
 
-import android.graphics.Path;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
-import org.robolectric.internal.Shadow;
-
-import java.util.List;
-
+import static android.os.Build.VERSION_CODES.O;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 import static org.robolectric.shadows.ShadowPath.Point.Type.LINE_TO;
 import static org.robolectric.shadows.ShadowPath.Point.Type.MOVE_TO;
 
+import android.graphics.Path;
+import android.graphics.PathIterator;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.List;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.annotation.GraphicsMode.Mode;
+import org.robolectric.versioning.AndroidVersions.U;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
+@GraphicsMode(Mode.LEGACY)
 public class ShadowPathTest {
 
-  @Test
-  public void testGradTo() {
-    Path path = Shadow.newInstanceOf(Path.class);
-    path.quadTo(0, 5, 10, 15);
-    ShadowPath shadowPath = shadowOf(path);
-    assertEquals(shadowPath.getQuadDescription(), "Add a quadratic bezier from last point, approaching (0.0,5.0), ending at (10.0,15.0)");
-  }
+  private static final float ERROR_TOLERANCE = 0.5f;
 
   @Test
-  public void testMoveTo() throws Exception {
-    Path path = Shadow.newInstanceOf(Path.class);
+  public void testMoveTo() {
+    Path path = new Path();
     path.moveTo(2, 3);
     path.moveTo(3, 4);
 
@@ -39,8 +38,8 @@ public class ShadowPathTest {
   }
 
   @Test
-  public void testLineTo() throws Exception {
-    Path path = Shadow.newInstanceOf(Path.class);
+  public void testLineTo() {
+    Path path = new Path();
     path.lineTo(2, 3);
     path.lineTo(3, 4);
 
@@ -51,8 +50,8 @@ public class ShadowPathTest {
   }
 
   @Test
-  public void testReset() throws Exception {
-    Path path = Shadow.newInstanceOf(Path.class);
+  public void testReset() {
+    Path path = new Path();
     path.moveTo(0, 3);
     path.lineTo(2, 3);
     path.quadTo(2, 3, 4, 5);
@@ -61,20 +60,74 @@ public class ShadowPathTest {
     ShadowPath shadowPath = shadowOf(path);
     List<ShadowPath.Point> points = shadowPath.getPoints();
     assertEquals(0, points.size());
-    assertNull(shadowPath.getWasMovedTo());
-    assertEquals("", shadowPath.getQuadDescription());
   }
 
   @Test
-  public void test_copyConstructor() throws Exception {
-    Path path = Shadow.newInstanceOf(Path.class);
+  public void copyConstructor_copiesShadowPoints() {
+    Path path = new Path();
     path.moveTo(0, 3);
     path.lineTo(2, 3);
     path.quadTo(2, 3, 4, 5);
 
     Path copiedPath = new Path(path);
+
     assertEquals(shadowOf(path).getPoints(), shadowOf(copiedPath).getPoints());
-    assertEquals(shadowOf(path).getWasMovedTo(), shadowOf(copiedPath).getWasMovedTo());
-    assertEquals(shadowOf(path).getQuadDescription(), shadowOf(copiedPath).getQuadDescription());
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void copyConstructor_copiesPathSegments() {
+    Path path = new Path();
+    path.moveTo(9, 3);
+    path.lineTo(2, 3);
+    path.quadTo(2, 3, 4, 5);
+    float[] segments = path.approximate(ERROR_TOLERANCE);
+
+    Path copiedPath = new Path(path);
+
+    assertArrayEquals(segments, copiedPath.approximate(ERROR_TOLERANCE), ERROR_TOLERANCE);
+  }
+
+  @Test
+  public void copyConstructor_copiesFillType() {
+    Path.FillType fillType = Path.FillType.INVERSE_EVEN_ODD;
+    Path path = new Path();
+    path.setFillType(fillType);
+
+    Path copiedPath = new Path(path);
+
+    assertEquals(fillType, copiedPath.getFillType());
+  }
+
+  @Test
+  public void copyConstructor_emptyPath_isEmpty() {
+    Path emptyPath = new Path();
+
+    Path copiedEmptyPath = new Path(emptyPath);
+
+    assertTrue(copiedEmptyPath.isEmpty());
+  }
+
+  @Test
+  public void emptyConstructor_isEmpty() {
+    Path emptyPath = new Path();
+
+    assertTrue(emptyPath.isEmpty());
+  }
+
+  @Config(minSdk = U.SDK_INT)
+  @Test
+  public void iterate_doesNotOOM() {
+    Path path = new Path();
+    path.moveTo(0, 0);
+    path.lineTo(0, 1);
+    path.lineTo(1, 1);
+    path.lineTo(0, 1);
+    path.lineTo(0, 0);
+    path.close();
+
+    for (PathIterator pathIterator = path.getPathIterator();
+        pathIterator.hasNext();
+        pathIterator.next()) {}
   }
 }

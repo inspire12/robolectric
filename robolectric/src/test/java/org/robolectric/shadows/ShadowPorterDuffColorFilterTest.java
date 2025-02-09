@@ -1,20 +1,20 @@
 package org.robolectric.shadows;
 
+import static android.os.Build.VERSION_CODES.O;
+import static com.google.common.truth.Truth.assertThat;
+
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
-import android.os.Build;
-
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.annotation.GraphicsMode.Mode;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
-@Config(sdk = {
-    Build.VERSION_CODES.LOLLIPOP })
+@RunWith(AndroidJUnit4.class)
+@GraphicsMode(Mode.LEGACY)
 public class ShadowPorterDuffColorFilterTest {
   @Test
   public void constructor_shouldWork() {
@@ -23,18 +23,11 @@ public class ShadowPorterDuffColorFilterTest {
     assertThat(filter.getMode()).isEqualTo(PorterDuff.Mode.ADD);
   }
 
+  @Config(minSdk = O)
   @Test
-  public void setColor_shouldWork() {
+  public void createNativeInstance_shouldWork() {
     final PorterDuffColorFilter filter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
-    filter.setColor(Color.BLUE);
-    assertThat(filter.getColor()).isEqualTo(Color.BLUE);
-  }
-
-  @Test
-  public void setMode_shouldWork() {
-    final PorterDuffColorFilter filter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
-    filter.setMode(PorterDuff.Mode.DST_IN);
-    assertThat(filter.getMode()).isEqualTo(PorterDuff.Mode.DST_IN);
+    assertThat(filter.getNativeInstance()).isEqualTo(0L);
   }
 
   @Test
@@ -51,5 +44,29 @@ public class ShadowPorterDuffColorFilterTest {
     PorterDuffColorFilter redFilter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
 
     assertThat(blueFilter.hashCode()).isNotEqualTo(redFilter.hashCode());
+  }
+
+  @Test
+  public void equals_returnsTrueForEqualObjects() {
+    PorterDuffColorFilter filter1 = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
+    PorterDuffColorFilter filter2 = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
+
+    assertThat(filter1).isEqualTo(filter2);
+  }
+
+  @Test
+  public void equals_returnsFalseForDifferentModes() {
+    PorterDuffColorFilter addFilter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
+    PorterDuffColorFilter dstFilter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.DST);
+
+    assertThat(addFilter).isNotEqualTo(dstFilter);
+  }
+
+  @Test
+  public void equals_returnsFalseForDifferentColors() {
+    PorterDuffColorFilter blueFilter = new PorterDuffColorFilter(Color.BLUE, PorterDuff.Mode.ADD);
+    PorterDuffColorFilter redFilter = new PorterDuffColorFilter(Color.RED, PorterDuff.Mode.ADD);
+
+    assertThat(blueFilter).isNotEqualTo(redFilter);
   }
 }

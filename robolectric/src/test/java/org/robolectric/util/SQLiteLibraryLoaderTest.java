@@ -1,144 +1,220 @@
 package org.robolectric.util;
 
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.TruthJUnit.assume;
+import static org.junit.Assert.assertThrows;
+
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 import org.robolectric.shadows.util.SQLiteLibraryLoader;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.WithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class SQLiteLibraryLoaderTest {
+  private static final SQLiteLibraryLoader.LibraryNameMapper LINUX =
+      new LibraryMapperTest("lib", "so");
+  private static final SQLiteLibraryLoader.LibraryNameMapper WINDOWS =
+      new LibraryMapperTest("", "dll");
+  private static final SQLiteLibraryLoader.LibraryNameMapper MAC =
+      new LibraryMapperTest("lib", "dylib");
+  private static final String OS_NAME_WINDOWS_XP = "Windows XP";
+  private static final String OS_NAME_WINDOWS_7 = "Windows 7";
+  private static final String OS_NAME_WINDOWS_10 = "Windows 10";
+  private static final String OS_NAME_LINUX = "Some linux version";
+  private static final String OS_NAME_MAC = "Mac OS X";
+  private static final String OS_ARCH_ARM64 = "aarch64";
+  private static final String OS_ARCH_X86 = "x86";
+  private static final String OS_ARCH_X64 = "x86_64";
+  private static final String OS_ARCH_AMD64 = "amd64";
+  private static final String OS_ARCH_I386 = "i386";
+  private static final String SYSTEM_PROPERTY_OS_NAME = "os.name";
+  private static final String SYSTEM_PROPERTY_OS_ARCH = "os.arch";
+
   /** Saved system properties. */
   private String savedOs, savedArch;
+
   private SQLiteLibraryLoader loader;
 
   @Before
-  public void deleteExtractedLibrary() {
+  public void setUp() {
     loader = new SQLiteLibraryLoader();
-    loader.getNativeLibraryPath().delete();
   }
 
   @Before
   public void saveSystemProperties() {
-    savedOs = System.getProperty("os.name");
-    savedArch = System.getProperty("os.arch");
+    savedOs = System.getProperty(SYSTEM_PROPERTY_OS_NAME);
+    savedArch = System.getProperty(SYSTEM_PROPERTY_OS_ARCH);
   }
 
   @After
   public void restoreSystemProperties() {
-    System.setProperty("os.name", savedOs);
-    System.setProperty("os.arch", savedArch);
+    System.setProperty(SYSTEM_PROPERTY_OS_NAME, savedOs);
+    System.setProperty(SYSTEM_PROPERTY_OS_ARCH, savedArch);
   }
 
   @Test
   public void shouldExtractNativeLibrary() {
-    File extractedPath = loader.getNativeLibraryPath();
-    assertThat(extractedPath).doesNotExist();
+    assume().that(SQLiteLibraryLoader.isOsSupported()).isTrue();
+    assertThat(loader.isLoaded()).isFalse();
     loader.doLoad();
-    assertThat(extractedPath).exists();
+    assertThat(loader.isLoaded()).isTrue();
   }
 
   @Test
-  public void shouldNotRewriteExistingLibraryIfThereAreNoChanges() throws Exception{
-    loader.doLoad();
-    File extractedPath = loader.getNativeLibraryPath();
-    assertThat(extractedPath).exists();
-
-    final long resetTime = 1234L;
-    assertThat(extractedPath.setLastModified(resetTime)).describedAs("Cannot reset modification date").isTrue();
-    // actual time may be truncated to seconds
-    long time = extractedPath.lastModified();
-    assertThat(time).isLessThanOrEqualTo(resetTime);
-
-    loader.mustReload();
-    loader.doLoad();
-    extractedPath = loader.getNativeLibraryPath();
-    assertThat(extractedPath.lastModified()).isEqualTo(time);
+  public void shouldFindLibraryForWindowsXPX86() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), OS_NAME_WINDOWS_XP, OS_ARCH_X86))
+        .isEqualTo("sqlite4java/win32-x86/sqlite4java.dll");
   }
 
   @Test
-  public void shouldRewriteExistingLibraryIfThereAreChanges() throws Exception {
-    loader.getNativeLibraryPath().getParentFile().mkdirs();
-
-    SQLiteLibraryLoader.copy(
-        new ByteArrayInputStream("changed".getBytes()),
-        new FileOutputStream(loader.getNativeLibraryPath()));
-    long firstSize = loader.getNativeLibraryPath().length();
-
-    loader.doLoad();
-    File extractedPath = loader.getNativeLibraryPath();
-    assertThat(extractedPath).exists();
-    assertThat(extractedPath.length()).isGreaterThan(firstSize);
+  public void shouldFindLibraryForWindows7X86() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), OS_NAME_WINDOWS_7, OS_ARCH_X86))
+        .isEqualTo("sqlite4java/win32-x86/sqlite4java.dll");
   }
 
   @Test
-  public void shouldFindLibraryForWindowsXPX86() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), "Windows XP", "x86"))
-            .isEqualTo("/windows-x86/sqlite4java.dll");
+  public void shouldFindLibraryForWindowsXPAmd64() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), OS_NAME_WINDOWS_XP, OS_ARCH_AMD64))
+        .isEqualTo("sqlite4java/win32-x64/sqlite4java.dll");
   }
 
   @Test
-  public void shouldFindLibraryForWindows7X86() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), "Windows 7", "x86"))
-            .isEqualTo("/windows-x86/sqlite4java.dll");
+  public void shouldFindLibraryForWindows7Amd64() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), OS_NAME_WINDOWS_7, OS_ARCH_AMD64))
+        .isEqualTo("sqlite4java/win32-x64/sqlite4java.dll");
   }
 
   @Test
-  public void shouldFindLibraryForWindowsXPAmd64() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), "Windows XP", "amd64"))
-            .isEqualTo("/windows-x86_64/sqlite4java.dll");
+  public void shouldFindLibraryForWindows10Amd64() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), OS_NAME_WINDOWS_10, OS_ARCH_AMD64))
+        .isEqualTo("sqlite4java/win32-x64/sqlite4java.dll");
   }
 
   @Test
-  public void shouldFindLibraryForWindows7Amd64() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(WINDOWS), "Windows 7", "amd64"))
-            .isEqualTo("/windows-x86_64/sqlite4java.dll");
+  public void shouldFindLibraryForLinuxI386() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), OS_NAME_LINUX, OS_ARCH_I386))
+        .isEqualTo("sqlite4java/linux-i386/libsqlite4java.so");
   }
 
   @Test
-  public void shouldFindLibraryForLinuxi386() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), "Some linux version", "i386"))
-            .isEqualTo("/linux-x86/libsqlite4java.so");
+  public void shouldFindLibraryForLinuxX86() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), OS_NAME_LINUX, OS_ARCH_X86))
+        .isEqualTo("sqlite4java/linux-i386/libsqlite4java.so");
   }
 
   @Test
-  public void shouldFindLibraryForLinuxx86() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), "Some linux version", "x86"))
-            .isEqualTo("/linux-x86/libsqlite4java.so");
+  public void shouldFindLibraryForLinuxAmd64() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), OS_NAME_LINUX, OS_ARCH_AMD64))
+        .isEqualTo("sqlite4java/linux-amd64/libsqlite4java.so");
   }
 
   @Test
-  public void shouldFindLibraryForLinuxAmd64() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(LINUX), "Some linux version", "amd64"))
-            .isEqualTo("/linux-x86_64/libsqlite4java.so");
+  public void shouldFindLibraryForMacWithI386() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(MAC), OS_NAME_MAC, OS_ARCH_I386))
+        .isEqualTo("sqlite4java/osx/libsqlite4java.dylib");
   }
 
   @Test
-  public void shouldFindLibraryForMacWithAnyArch() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(MAC), "Mac OS X", "any architecture"))
-            .isEqualTo("/mac-x86_64/libsqlite4java.jnilib");
+  public void shouldFindLibraryForMacWithX86() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(MAC), OS_NAME_MAC, OS_ARCH_X86))
+        .isEqualTo("sqlite4java/osx/libsqlite4java.dylib");
   }
 
   @Test
-  public void shouldFindLibraryForMacWithAnyArchAndDyLibMapping() throws IOException {
-    assertThat(loadLibrary(new SQLiteLibraryLoader(MAC_DYLIB), "Mac OS X", "any architecture"))
-            .isEqualTo("/mac-x86_64/libsqlite4java.jnilib");
+  public void shouldFindLibraryForMacWithX64() {
+    assertThat(loadLibrary(new SQLiteLibraryLoader(MAC), OS_NAME_MAC, OS_ARCH_X64))
+        .isEqualTo("sqlite4java/osx/libsqlite4java.dylib");
   }
 
-  @Test(expected = UnsupportedOperationException.class)
-  public void shouldThrowExceptionIfUnknownNameAndArch() throws Exception {
-    loadLibrary(new SQLiteLibraryLoader(LINUX), "ACME Electronic", "FooBar2000");
+  @Test
+  public void shouldNotFindLibraryForMacWithARM64() {
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> loadLibrary(new SQLiteLibraryLoader(MAC), OS_NAME_MAC, OS_ARCH_ARM64));
   }
 
-  private String loadLibrary(SQLiteLibraryLoader loader, String name, String arch) throws IOException {
+  @Test
+  public void shouldThrowExceptionIfUnknownNameAndArch() {
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> loadLibrary(new SQLiteLibraryLoader(LINUX), "ACME Electronic", "FooBar2000"));
+  }
+
+  @Test
+  public void shouldNotSupportMacOSWithArchArm64() {
+    setNameAndArch(OS_NAME_MAC, OS_ARCH_ARM64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isFalse();
+  }
+
+  @Test
+  public void shouldSupportMacOSWithArchX86() {
+    setNameAndArch(OS_NAME_MAC, OS_ARCH_X86);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportMacOSWithArchX64() {
+    setNameAndArch(OS_NAME_MAC, OS_ARCH_X64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportWindowsXPWithArchX86() {
+    setNameAndArch(OS_NAME_WINDOWS_XP, OS_ARCH_X86);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportWindowsXPWithArcAMD64() {
+    setNameAndArch(OS_NAME_WINDOWS_XP, OS_ARCH_AMD64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportWindows7WithArchX86() {
+    setNameAndArch(OS_NAME_WINDOWS_7, OS_ARCH_X86);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportWindows7WithAMD64() {
+    setNameAndArch(OS_NAME_WINDOWS_7, OS_ARCH_AMD64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportWindows10WithAMD64() {
+    setNameAndArch(OS_NAME_WINDOWS_10, OS_ARCH_AMD64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportLinuxWithI386() {
+    setNameAndArch(OS_NAME_LINUX, OS_ARCH_I386);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportLinuxWithX86() {
+    setNameAndArch(OS_NAME_LINUX, OS_ARCH_X86);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportLinuxWithX64() {
+    setNameAndArch(OS_NAME_LINUX, OS_ARCH_X64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  @Test
+  public void shouldSupportLinuxWithAMD64() {
+    setNameAndArch(OS_NAME_LINUX, OS_ARCH_AMD64);
+    assertThat(SQLiteLibraryLoader.isOsSupported()).isTrue();
+  }
+
+  private String loadLibrary(SQLiteLibraryLoader loader, String name, String arch) {
     setNameAndArch(name, arch);
     return loader.getLibClasspathResourceName();
   }
@@ -159,12 +235,7 @@ public class SQLiteLibraryLoaderTest {
   }
 
   private static void setNameAndArch(String name, String arch) {
-    System.setProperty("os.name", name);
-    System.setProperty("os.arch", arch);
+    System.setProperty(SYSTEM_PROPERTY_OS_NAME, name);
+    System.setProperty(SYSTEM_PROPERTY_OS_ARCH, arch);
   }
-
-  private static final SQLiteLibraryLoader.LibraryNameMapper LINUX = new LibraryMapperTest("lib", "so");
-  private static final SQLiteLibraryLoader.LibraryNameMapper WINDOWS = new LibraryMapperTest("", "dll");
-  private static final SQLiteLibraryLoader.LibraryNameMapper MAC = new LibraryMapperTest("lib", "jnilib");
-  private static final SQLiteLibraryLoader.LibraryNameMapper MAC_DYLIB = new LibraryMapperTest("lib", "dylib");
 }

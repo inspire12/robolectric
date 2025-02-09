@@ -1,148 +1,126 @@
 package org.robolectric.shadows;
 
-import android.app.Activity;
-import android.content.res.AssetFileDescriptor;
-import android.content.res.AssetManager;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
 
+import android.content.res.AssetManager;
+import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.robolectric.R;
 import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.annotation.Config;
-import org.robolectric.util.Strings;
+import org.robolectric.annotation.ResourcesMode;
+import org.robolectric.annotation.ResourcesMode.Mode;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.robolectric.util.TestUtil.joinPath;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
+@ResourcesMode(Mode.BINARY)
 public class ShadowAssetManagerTest {
 
-  @Rule
-  public ExpectedException expectedException = ExpectedException.none();
+  @Rule public ExpectedException expectedException = ExpectedException.none();
 
-  AssetManager assetManager;
+  private AssetManager assetManager;
+  private Resources resources;
 
   @Before
   public void setUp() throws Exception {
-    assetManager = Robolectric.buildActivity(Activity.class).create().get().getAssets();
+    resources = ApplicationProvider.getApplicationContext().getResources();
+    assetManager = resources.getAssets();
   }
 
   @Test
-  public void assertGetAssetsNotNull() {
-    assertNotNull(assetManager);
+  public void openFd_shouldProvideFileDescriptorForDeflatedAsset() throws Exception {
+    expectedException.expect(FileNotFoundException.class);
+    expectedException.expectMessage(
+        "This file can not be opened as a file descriptor; it is probably compressed");
 
-    assetManager = RuntimeEnvironment.application.getAssets();
-    assertNotNull(assetManager);
-
-    assetManager = RuntimeEnvironment.application.getResources().getAssets();
-    assertNotNull(assetManager);
-  }
-
-  @Test
-  public void assetsPathListing() throws IOException {
-    List<String> files;
-    String testPath;
-
-    testPath = "";
-    files = Arrays.asList(assetManager.list(testPath));
-    assertTrue(files.contains("docs"));
-    assertTrue(files.contains("assetsHome.txt"));
-
-    testPath = "docs";
-    files = Arrays.asList(assetManager.list(testPath));
-    assertTrue(files.contains("extra"));
-
-    testPath = joinPath("docs", "extra");
-    files = Arrays.asList(assetManager.list(testPath));
-    assertTrue(files.contains("testing"));
-
-    testPath = joinPath("docs", "extra", "testing");
-    files = Arrays.asList(assetManager.list(testPath));
-    assertTrue(files.contains("hello.txt"));
-
-    testPath = "assetsHome.txt";
-    files = Arrays.asList(assetManager.list(testPath));
-    assertFalse(files.contains(testPath));
-
-    testPath = "bogus.file";
-    files = Arrays.asList(assetManager.list(testPath));
-    assertEquals(0, files.size());
-  }
-
-  @Test
-  public void open_shouldOpenFile() throws IOException {
-    final String contents = Strings.fromStream(assetManager.open("assetsHome.txt"));
-    assertThat(contents).isEqualTo("assetsHome!");
-  }
-
-  @Test
-  public void open_withAccessMode_shouldOpenFile() throws IOException {
-    final String contents = Strings.fromStream(assetManager.open("assetsHome.txt", AssetManager.ACCESS_BUFFER));
-    assertThat(contents).isEqualTo("assetsHome!");
-  }
-
-  @Test
-  public void openFd_shouldProvideFileDescriptorForAsset() throws Exception {
-    AssetFileDescriptor assetFileDescriptor = assetManager.openFd("assetsHome.txt");
-    assertThat(Strings.fromStream(assetFileDescriptor.createInputStream())).isEqualTo("assetsHome!");
-    assertThat(assetFileDescriptor.getLength()).isEqualTo(11);
+    assetManager.openFd("deflatedAsset.xml");
   }
 
   @Test
   public void openNonAssetShouldOpenRealAssetFromResources() throws IOException {
-    InputStream inputStream = assetManager.openNonAsset(0, "./res/drawable/an_image.png", 0);
+    InputStream inputStream = assetManager.openNonAsset(0, "res/drawable/an_image.png", 0);
 
-    ByteArrayInputStream byteArrayInputStream = (ByteArrayInputStream) inputStream;
-    assertThat(byteArrayInputStream.available()).isEqualTo(6559);
+    // expect different sizes in binary vs file resources
+    int bytes = countBytes(inputStream);
+    if (bytes != 6559 && bytes != 5138) {
+      fail("Expected 5138 or 6559 bytes for image but got " + bytes);
+    }
   }
 
   @Test
-  public void openNonAssetShouldOpenRealAssetFromAndroidJar() throws IOException {
-    // Not the real full path (it's in .m2/repository), but it only cares about the last folder and file name
-    final String jarFile = "jar:/android-all-5.0.0_r2-robolectric-0.jar!/res/drawable-hdpi/bottom_bar.png";
-
-    InputStream inputStream = assetManager.openNonAsset(0, jarFile, 0);
-    assertThat(((ByteArrayInputStream) inputStream).available()).isEqualTo(389);
+  public void openNonAssetShouldOpenFileFromAndroidJar() throws IOException {
+    String fileName = "res/raw/fallbackring.ogg";
+    InputStream inputStream = assetManager.openNonAsset(0, fileName, 0);
+    assertThat(countBytes(inputStream)).isEqualTo(14611);
   }
 
+  // todo: port to ResourcesTest
   @Test
-  public void openNonAssetShouldThrowExceptionWhenFileDoesNotExist() throws IOException {
-    expectedException.expect(IOException.class);
-    expectedException.expectMessage("Unable to find resource for ./res/drawable/does_not_exist.png");
-
-    assetManager.openNonAsset(0, "./res/drawable/does_not_exist.png", 0);
+  public void multiFormatAttributes_integerDecimalValue() {
+    AttributeSet attributeSet =
+        Robolectric.buildAttributeSet().addAttribute(R.attr.multiformat, "16").build();
+    TypedArray typedArray =
+        resources.obtainAttributes(attributeSet, new int[] {R.attr.multiformat});
+    TypedValue outValue = new TypedValue();
+    typedArray.getValue(0, outValue);
+    assertThat(outValue.type).isEqualTo(TypedValue.TYPE_INT_DEC);
   }
 
+  // todo: port to ResourcesTest
   @Test
-  @Config(qualifiers = "mdpi")
-  public void openNonAssetShouldOpenCorrectAssetBasedOnQualifierMdpi() throws IOException {
-    InputStream inputStream = assetManager.openNonAsset(0, "./res/drawable/robolectric.png", 0);
-
-    ByteArrayInputStream byteArrayInputStream = (ByteArrayInputStream) inputStream;
-    assertThat(byteArrayInputStream.available()).isEqualTo(8141);
+  public void multiFormatAttributes_integerHexValue() {
+    AttributeSet attributeSet =
+        Robolectric.buildAttributeSet().addAttribute(R.attr.multiformat, "0x10").build();
+    TypedArray typedArray =
+        resources.obtainAttributes(attributeSet, new int[] {R.attr.multiformat});
+    TypedValue outValue = new TypedValue();
+    typedArray.getValue(0, outValue);
+    assertThat(outValue.type).isEqualTo(TypedValue.TYPE_INT_HEX);
   }
 
+  // todo: port to ResourcesTest
   @Test
-  @Config(qualifiers = "hdpi")
-  public void openNonAssetShouldOpenCorrectAssetBasedOnQualifierHdpi() throws IOException {
-    InputStream inputStream = assetManager.openNonAsset(0, "./res/drawable/robolectric.png", 0);
-
-    ByteArrayInputStream byteArrayInputStream = (ByteArrayInputStream) inputStream;
-    assertThat(byteArrayInputStream.available()).isEqualTo(23447);
+  public void multiFormatAttributes_stringValue() {
+    AttributeSet attributeSet =
+        Robolectric.buildAttributeSet().addAttribute(R.attr.multiformat, "Hello World").build();
+    TypedArray typedArray =
+        resources.obtainAttributes(attributeSet, new int[] {R.attr.multiformat});
+    TypedValue outValue = new TypedValue();
+    typedArray.getValue(0, outValue);
+    assertThat(outValue.type).isEqualTo(TypedValue.TYPE_STRING);
   }
 
+  // todo: port to ResourcesTest
+  @Test
+  public void multiFormatAttributes_booleanValue() {
+    AttributeSet attributeSet =
+        Robolectric.buildAttributeSet().addAttribute(R.attr.multiformat, "true").build();
+    TypedArray typedArray =
+        resources.obtainAttributes(attributeSet, new int[] {R.attr.multiformat});
+    TypedValue outValue = new TypedValue();
+    typedArray.getValue(0, outValue);
+    assertThat(outValue.type).isEqualTo(TypedValue.TYPE_INT_BOOLEAN);
+  }
+
+  ///////////////////////////////
+
+  private static int countBytes(InputStream i) throws IOException {
+    int count = 0;
+    while (i.read() != -1) {
+      count++;
+    }
+    i.close();
+    return count;
+  }
 }

@@ -3,12 +3,13 @@ package org.robolectric.shadows.testing;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import org.robolectric.util.Transcript;
+import java.util.List;
+import javax.annotation.Nonnull;
 
 public class OnMethodTestActivity extends Activity {
-  private final Transcript transcript;
+  private final List<String> transcript;
 
-  public OnMethodTestActivity(Transcript transcript) {
+  public OnMethodTestActivity(List<String> transcript) {
     this.transcript = transcript;
   }
 
@@ -23,7 +24,7 @@ public class OnMethodTestActivity extends Activity {
   }
 
   @Override
-  protected void onRestoreInstanceState(Bundle savedInstanceState) {
+  protected void onRestoreInstanceState(@Nonnull Bundle savedInstanceState) {
     transcript.add("onRestoreInstanceState was called");
   }
 
@@ -53,7 +54,7 @@ public class OnMethodTestActivity extends Activity {
   }
 
   @Override
-  protected void onSaveInstanceState(Bundle outState) {
+  protected void onSaveInstanceState(@Nonnull Bundle outState) {
     transcript.add("onSaveInstanceState was called");
   }
 

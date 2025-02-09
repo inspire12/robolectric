@@ -1,277 +1,596 @@
 package org.robolectric;
 
-import android.app.Application;
+import static com.google.common.truth.Truth.assertThat;
+import static java.util.stream.Collectors.toSet;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.robolectric.RobolectricTestRunner.defaultInjector;
+import static org.robolectric.shadows.ShadowLooper.shadowMainLooper;
 
+import android.annotation.SuppressLint;
+import android.app.Application;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.spi.FileSystemProvider;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import javax.annotation.Nonnull;
+import javax.inject.Inject;
+import javax.inject.Named;
+import org.junit.After;
+import org.junit.AssumptionViolatedException;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.FixMethodOrder;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.runners.model.InitializationError;
+import org.junit.runner.Description;
+import org.junit.runner.Result;
+import org.junit.runner.RunWith;
+import org.junit.runner.notification.Failure;
+import org.junit.runner.notification.RunListener;
+import org.junit.runner.notification.RunNotifier;
+import org.junit.runners.JUnit4;
+import org.junit.runners.MethodSorters;
+import org.robolectric.RobolectricTestRunner.RobolectricFrameworkMethod;
+import org.robolectric.android.internal.AndroidTestEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.experimental.LazyApplication;
+import org.robolectric.annotation.experimental.LazyApplication.LazyLoad;
+import org.robolectric.config.ConfigurationRegistry;
+import org.robolectric.internal.AndroidSandbox.TestEnvironmentSpec;
+import org.robolectric.internal.ShadowProvider;
 import org.robolectric.manifest.AndroidManifest;
-import org.robolectric.res.PackageResourceLoader;
-import org.robolectric.res.ResourceIndex;
-import org.robolectric.res.ResourceLoader;
-import org.robolectric.res.ResourcePath;
-import org.robolectric.shadows.ShadowView;
-import org.robolectric.shadows.ShadowViewGroup;
+import org.robolectric.pluginapi.Sdk;
+import org.robolectric.pluginapi.SdkProvider;
+import org.robolectric.pluginapi.TestEnvironmentLifecyclePlugin;
+import org.robolectric.pluginapi.config.ConfigurationStrategy.Configuration;
+import org.robolectric.pluginapi.perf.Metric;
+import org.robolectric.pluginapi.perf.PerfStatsReporter;
+import org.robolectric.plugins.DefaultSdkPicker;
+import org.robolectric.plugins.SdkCollection;
+import org.robolectric.plugins.StubSdk;
+import org.robolectric.util.TempDirectory;
+import org.robolectric.util.TestUtil;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Properties;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
+@SuppressWarnings("NewApi")
+@RunWith(JUnit4.class)
 public class RobolectricTestRunnerTest {
-  @Test
-  public void whenClassHasConfigAnnotation_getConfig_shouldMergeClassAndMethodConfig() throws Exception {
-    assertConfig(configFor(Test1.class, "withoutAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-test", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
 
-    assertConfig(configFor(Test1.class, "withDefaultsAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-test", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
+  private RunNotifier notifier;
+  private List<String> events;
+  private String priorEnabledSdks;
+  private String priorAlwaysInclude;
+  private SdkCollection sdkCollection;
 
-    assertConfig(configFor(Test1.class, "withOverrideAnnotation"),
-        new int[] {9}, "furf", TestApplication.class, "com.example.method", "from-method", "method/res", "method/assets", new Class[]{Test1.class, Test2.class}, new String[]{"com.example.test1", "com.example.method1"}, new String[]{"libs/method", "libs/test"}, BuildConfigConstants2.class);
+  @Before
+  public void setUp() throws Exception {
+    notifier = new RunNotifier();
+    events = new ArrayList<>();
+    notifier.addListener(new MyRunListener());
+
+    priorEnabledSdks = System.getProperty("robolectric.enabledSdks");
+    System.clearProperty("robolectric.enabledSdks");
+
+    priorAlwaysInclude = System.getProperty("robolectric.alwaysIncludeVariantMarkersInTestName");
+    System.clearProperty("robolectric.alwaysIncludeVariantMarkersInTestName");
+
+    sdkCollection = TestUtil.getSdkCollection();
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    TestUtil.resetSystemProperty(
+        "robolectric.alwaysIncludeVariantMarkersInTestName", priorAlwaysInclude);
+    TestUtil.resetSystemProperty("robolectric.enabledSdks", priorEnabledSdks);
   }
 
   @Test
-  public void whenClassDoesntHaveConfigAnnotation_getConfig_shouldUseMethodConfig() throws Exception {
-    assertConfig(configFor(Test2.class, "withoutAnnotation"),
-        new int[0], "--default", Application.class, "", "", "res", "assets", new Class[]{}, new String[]{}, new String[]{}, Void.class);
-
-    assertConfig(configFor(Test2.class, "withDefaultsAnnotation"),
-        new int[0], "--default", Application.class, "", "", "res", "assets", new Class[]{}, new String[]{}, new String[]{}, Void.class);
-
-    assertConfig(configFor(Test2.class, "withOverrideAnnotation"),
-        new int[] {9}, "furf", TestFakeApp.class, "com.example.method", "from-method", "method/res", "method/assets", new Class[]{Test1.class}, new String[]{"com.example.method2"}, new String[]{"libs/method"}, BuildConfigConstants.class);
+  public void ignoredTestCanSpecifyUnsupportedSdkWithoutExploding() throws Exception {
+    RobolectricTestRunner runner =
+        new RobolectricTestRunner(
+            TestWithOldSdk.class,
+            org.robolectric.RobolectricTestRunner.defaultInjector()
+                .bind(org.robolectric.pluginapi.SdkPicker.class, AllEnabledSdkPicker.class)
+                .build());
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: oldSdkMethod",
+            "failure: API level 11 is not available",
+            "finished: oldSdkMethod",
+            "ignored: ignoredOldSdkMethod")
+        .inOrder();
   }
 
   @Test
-  public void whenClassDoesntHaveConfigAnnotation_getConfig_shouldMergeParentClassAndMethodConfig() throws Exception {
-    assertConfig(configFor(Test5.class, "withoutAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-test", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
-
-    assertConfig(configFor(Test5.class, "withDefaultsAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-test", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
-
-    assertConfig(configFor(Test5.class, "withOverrideAnnotation"),
-        new int[] {14}, "foo", TestFakeApp.class, "com.example.test", "from-method5", "test/res", "method5/assets", new Class[]{Test1.class, Test5.class}, new String[]{"com.example.test1", "com.example.method5"}, new String[]{"libs/test"}, BuildConfigConstants5.class);
+  public void testsWithUnsupportedSdkShouldBeIgnored() throws Exception {
+    RobolectricTestRunner runner =
+        new RobolectricTestRunner(
+            TestWithTwoMethods.class,
+            defaultInjector()
+                .bind(
+                    SdkProvider.class,
+                    () ->
+                        Arrays.asList(
+                            TestUtil.getSdkCollection().getSdk(33), new StubSdk(34, false)))
+                .build());
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first[33]",
+            "finished: first[33]",
+            "started: first",
+            "ignored: first: Failed to create a Robolectric sandbox: unsupported",
+            "finished: first",
+            "started: second[33]",
+            "finished: second[33]",
+            "started: second",
+            "ignored: second: Failed to create a Robolectric sandbox: unsupported",
+            "finished: second")
+        .inOrder();
   }
 
   @Test
-  public void whenClassAndParentClassHaveConfigAnnotation_getConfig_shouldMergeParentClassAndMethodConfig() throws Exception {
-    assertConfig(configFor(Test6.class, "withoutAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-class6", "class6/res", "test/assets", new Class[]{Test1.class, Test6.class}, new String[]{"com.example.test1", "com.example.test6"}, new String[]{"libs/test"}, BuildConfigConstants6.class);
-
-    assertConfig(configFor(Test6.class, "withDefaultsAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-class6", "class6/res", "test/assets", new Class[]{Test1.class, Test6.class}, new String[]{"com.example.test1", "com.example.test6"}, new String[]{"libs/test"}, BuildConfigConstants6.class);
-
-    assertConfig(configFor(Test6.class, "withOverrideAnnotation"),
-        new int[] {14}, "foo", TestFakeApp.class, "com.example.test", "from-method5", "class6/res", "method5/assets", new Class[]{Test1.class, Test5.class, Test6.class}, new String[]{"com.example.test1", "com.example.method5", "com.example.test6"}, new String[]{"libs/test"}, BuildConfigConstants5.class);
+  public void failureInResetterDoesntBreakAllTests() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(
+            TestWithTwoMethods.class,
+            SingleSdkRobolectricTestRunner.defaultInjector()
+                .bind(
+                    TestEnvironmentSpec.class,
+                    new TestEnvironmentSpec(AndroidTestEnvironmentWithFailingSetUp.class))
+                .build());
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first",
+            "failure: fake error in setUpApplicationState",
+            "finished: first",
+            "started: second",
+            "failure: fake error in setUpApplicationState",
+            "finished: second")
+        .inOrder();
   }
 
   @Test
-  public void whenClassAndSubclassHaveConfigAnnotation_getConfig_shouldMergeClassSubclassAndMethodConfig() throws Exception {
-    assertConfig(configFor(Test3.class, "withoutAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-subclass", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
-
-    assertConfig(configFor(Test3.class, "withDefaultsAnnotation"),
-        new int[] {1}, "foo", TestFakeApp.class, "com.example.test", "from-subclass", "test/res", "test/assets", new Class[]{Test1.class}, new String[]{"com.example.test1"}, new String[]{"libs/test"}, BuildConfigConstants.class);
-
-    assertConfig(configFor(Test3.class, "withOverrideAnnotation"),
-        new int[] {9},"furf", TestApplication.class, "com.example.method", "from-method", "method/res", "method/assets", new Class[]{Test1.class, Test2.class}, new String[]{"com.example.test1", "com.example.method1"}, new String[]{"libs/method", "libs/test"}, BuildConfigConstants2.class);
+  public void noClassDefError_isReplacedByBetterLinkageError() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(
+            TestWithTwoMethods.class,
+            SingleSdkRobolectricTestRunner.defaultInjector()
+                .bind(
+                    TestEnvironmentSpec.class,
+                    new TestEnvironmentSpec(AndroidTestEnvironmentThrowsLinkageError.class))
+                .build());
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first",
+            "failure: java.lang.ExceptionInInitializerError",
+            "finished: first",
+            "started: second",
+            "failure: java.lang.ExceptionInInitializerError",
+            "finished: second")
+        .inOrder();
   }
 
   @Test
-  public void whenClassDoesntHaveConfigAnnotationButSubclassDoes_getConfig_shouldMergeSubclassAndMethodConfig() throws Exception {
-    assertConfig(configFor(Test4.class, "withoutAnnotation"),
-        new int[0],  "--default", Application.class, "", "from-subclass", "res", "assets", new Class[]{}, new String[]{}, new String[]{}, Void.class);
-
-    assertConfig(configFor(Test4.class, "withDefaultsAnnotation"),
-        new int[0],  "--default", Application.class, "", "from-subclass", "res", "assets", new Class[]{}, new String[]{}, new String[]{}, Void.class);
-
-    assertConfig(configFor(Test4.class, "withOverrideAnnotation"),
-        new int[] {9}, "furf", TestFakeApp.class, "com.example.method", "from-method", "method/res", "method/assets", new Class[]{Test1.class}, new String[]{"com.example.method2"}, new String[]{"libs/method"}, BuildConfigConstants.class);
+  public void failureInAppOnCreateDoesntBreakAllTests() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(TestWithBrokenAppCreate.class);
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first",
+            "failure: fake error in application.onCreate",
+            "finished: first",
+            "started: second",
+            "failure: fake error in application.onCreate",
+            "finished: second")
+        .inOrder();
   }
 
   @Test
-  public void shouldLoadDefaultsFromPropertiesFile() throws Exception {
-    Properties properties = properties(
-        "sdk: 432\n" +
-            "manifest: --none\n" +
-            "qualifiers: from-properties-file\n" +
-            "resourceDir: from/properties/file/res\n" +
-            "assetDir: from/properties/file/assets\n" +
-            "shadows: org.robolectric.shadows.ShadowView, org.robolectric.shadows.ShadowViewGroup\n" +
-            "application: org.robolectric.TestFakeApp\n" +
-            "packageName: com.example.test\n" +
-            "instrumentedPackages: com.example.test1, com.example.test2\n" +
-            "libraries: libs/test, libs/test2\n" +
-            "constants: org.robolectric.RobolectricTestRunnerTest$BuildConfigConstants3");
-
-    assertConfig(configFor(Test2.class, "withoutAnnotation", properties),
-        new int[] {432}, "--none", TestFakeApp.class, "com.example.test", "from-properties-file", "from/properties/file/res", "from/properties/file/assets", new Class[] {ShadowView.class, ShadowViewGroup.class}, new String[]{"com.example.test1", "com.example.test2"}, new String[]{"libs/test", "libs/test2"}, BuildConfigConstants3.class);
+  public void failureInAppOnTerminateDoesntBreakAllTests() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(TestWithBrokenAppTerminate.class);
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first",
+            "failure: fake error in application.onTerminate",
+            "finished: first",
+            "started: second",
+            "failure: fake error in application.onTerminate",
+            "finished: second")
+        .inOrder();
   }
 
   @Test
-  public void withEmptyShadowList_shouldLoadDefaultsFromPropertiesFile() throws Exception {
-    Properties properties = properties("shadows:");
-    assertConfig(configFor(Test2.class, "withoutAnnotation", properties), new int[0],  "--default", Application.class, "", "", "res", "assets", new Class[] {}, new String[]{}, new String[]{}, null);
+  public void equalityOfRobolectricFrameworkMethod() throws Exception {
+    Method method = TestWithTwoMethods.class.getMethod("first");
+    RobolectricFrameworkMethod rfm16 =
+        new RobolectricFrameworkMethod(
+            method,
+            mock(AndroidManifest.class),
+            sdkCollection.getSdk(16),
+            mock(Configuration.class),
+            false);
+    RobolectricFrameworkMethod rfm17 =
+        new RobolectricFrameworkMethod(
+            method,
+            mock(AndroidManifest.class),
+            sdkCollection.getSdk(17),
+            mock(Configuration.class),
+            false);
+    RobolectricFrameworkMethod rfm16b =
+        new RobolectricFrameworkMethod(
+            method,
+            mock(AndroidManifest.class),
+            sdkCollection.getSdk(16),
+            mock(Configuration.class),
+            false);
+
+    assertThat(rfm16).isNotEqualTo(rfm17);
+    assertThat(rfm16).isEqualTo(rfm16b);
+
+    assertThat(rfm16.hashCode()).isEqualTo(rfm16b.hashCode());
   }
 
-  private Config configFor(Class<?> testClass, String methodName, final Properties configProperties) throws InitializationError {
-    Method info;
-    try {
-      info = testClass.getMethod(methodName);
-    } catch (NoSuchMethodException e) {
-      throw new RuntimeException(e);
+  @Test
+  public void shouldReportPerfStats() throws Exception {
+    List<Metric> metrics = new ArrayList<>();
+    PerfStatsReporter reporter = (metadata, metrics1) -> metrics.addAll(metrics1);
+
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(
+            TestWithTwoMethods.class,
+            SingleSdkRobolectricTestRunner.defaultInjector()
+                .bind(PerfStatsReporter[].class, new PerfStatsReporter[] {reporter})
+                .build());
+
+    runner.run(notifier);
+
+    Set<String> metricNames = metrics.stream().map(Metric::getName).collect(toSet());
+    assertThat(metricNames).contains("initialization");
+  }
+
+  @Test
+  public void failedTest_shouldStillReportPerfStats() throws Exception {
+    List<Metric> metrics = new ArrayList<>();
+    PerfStatsReporter reporter = (metadata, metrics1) -> metrics.addAll(metrics1);
+
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(
+            TestThatFails.class,
+            SingleSdkRobolectricTestRunner.defaultInjector()
+                .bind(PerfStatsReporter[].class, new PerfStatsReporter[] {reporter})
+                .build());
+
+    runner.run(notifier);
+
+    Set<String> metricNames = metrics.stream().map(Metric::getName).collect(toSet());
+    assertThat(metricNames).contains("initialization");
+  }
+
+  @Test
+  public void shouldResetThreadInterrupted() throws Exception {
+    RobolectricTestRunner runner = new SingleSdkRobolectricTestRunner(TestWithInterrupt.class);
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: first",
+            "finished: first",
+            "started: second",
+            "failure: failed for the right reason",
+            "finished: second");
+  }
+
+  @Test
+  public void shouldDiagnoseUnexecutedRunnables() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(TestWithUnexecutedRunnables.class);
+    runner.run(notifier);
+    assertThat(events)
+        .containsExactly(
+            "started: failWithNoRunnables",
+            "failure: failing with no runnables",
+            "finished: failWithNoRunnables",
+            "started: failWithUnexecutedRunnables",
+            "failure: failing with unexecuted runnable\n"
+                + "Suppressed: Main looper has queued unexecuted runnables. "
+                + "This might be the cause of the test failure. "
+                + "You might need a shadowOf(Looper.getMainLooper()).idle() call.",
+            "finished: failWithUnexecutedRunnables",
+            "started: assumptionViolationWithNoRunnables",
+            "ignored: assumptionViolationWithNoRunnables: assumption violated",
+            "finished: assumptionViolationWithNoRunnables",
+            "started: assumptionViolationWithUnexecutedRunnables",
+            "ignored: assumptionViolationWithUnexecutedRunnables: assumption violated",
+            "finished: assumptionViolationWithUnexecutedRunnables");
+  }
+
+  /////////////////////////////
+
+  /** To simulate failures. */
+  public static class AndroidTestEnvironmentWithFailingSetUp extends AndroidTestEnvironment {
+
+    public AndroidTestEnvironmentWithFailingSetUp(
+        @Named("runtimeSdk") Sdk runtimeSdk,
+        @Named("compileSdk") Sdk compileSdk,
+        ShadowProvider[] shadowProviders,
+        TestEnvironmentLifecyclePlugin[] lifecyclePlugins) {
+      super(runtimeSdk, compileSdk, shadowProviders, lifecyclePlugins);
     }
-    return new RobolectricTestRunner(testClass) {
-      @Override protected Properties getConfigProperties() {
-        return configProperties;
+
+    @Override
+    public void setUpApplicationState(
+        String tmpDirName, Configuration configuration, AndroidManifest appManifest) {
+      // ConfigurationRegistry.instance is required for resetters.
+      ConfigurationRegistry.instance = new ConfigurationRegistry(configuration.map());
+      throw new RuntimeException("fake error in setUpApplicationState");
+    }
+  }
+
+  public static class AndroidTestEnvironmentThrowsLinkageError extends AndroidTestEnvironment {
+
+    public static final class UnloadableClass {
+      static {
+        if (true) {
+          throw new RuntimeException("error in static initializer");
+        }
       }
-    }.getConfig(info);
-  }
 
-  private Config configFor(Class<?> testClass, String methodName) throws InitializationError {
-    Method info;
-    try {
-      info = testClass.getMethod(methodName);
-    } catch (NoSuchMethodException e) {
-      throw new RuntimeException(e);
-    }
-    return new RobolectricTestRunner(testClass).getConfig(info);
-  }
+      public static void doStuff() {}
 
-  private void assertConfig(Config config, int[] sdk, String manifest, Class<? extends Application> application, String packageName, String qualifiers, String resourceDir, String assetsDir, Class<?>[] shadows, String[] instrumentedPackages, String[] libraries, Class<?> constants) {
-    assertThat(stringify(config)).isEqualTo(stringify(sdk, manifest, application, packageName, qualifiers, resourceDir, assetsDir, shadows, instrumentedPackages, libraries, constants));
-  }
-
-  @Ignore
-  @Config(sdk = 1, manifest = "foo", application = TestFakeApp.class, packageName = "com.example.test", shadows = Test1.class, instrumentedPackages = "com.example.test1", libraries = "libs/test", qualifiers = "from-test", resourceDir = "test/res", assetDir = "test/assets", constants = BuildConfigConstants.class)
-  public static class Test1 {
-    @Test
-    public void withoutAnnotation() throws Exception {
+      private UnloadableClass() {}
     }
 
-    @Test
-    @Config
-    public void withDefaultsAnnotation() throws Exception {
-    }
-
-    @Test
-    @Config(sdk = 9, manifest = "furf", application = TestApplication.class, packageName = "com.example.method", shadows = Test2.class, instrumentedPackages = "com.example.method1", libraries = "libs/method", qualifiers = "from-method", resourceDir = "method/res", assetDir = "method/assets", constants = BuildConfigConstants2.class)
-    public void withOverrideAnnotation() throws Exception {
-    }
-  }
-
-  @Ignore
-  public static class Test2 {
-    @Test
-    public void withoutAnnotation() throws Exception {
-    }
-
-    @Test
-    @Config
-    public void withDefaultsAnnotation() throws Exception {
-    }
-
-    @Test
-    @Config(sdk = 9, manifest = "furf", application = TestFakeApp.class, packageName = "com.example.method", shadows = Test1.class, instrumentedPackages = "com.example.method2", libraries = "libs/method", qualifiers = "from-method", resourceDir = "method/res", assetDir = "method/assets", constants = BuildConfigConstants.class)
-    public void withOverrideAnnotation() throws Exception {
-    }
-  }
-
-  @Ignore
-  @Config(qualifiers = "from-subclass")
-  public static class Test3 extends Test1 {
-  }
-
-  @Ignore
-  @Config(qualifiers = "from-subclass")
-  public static class Test4 extends Test2 {
-  }
-
-  @Ignore
-  public static class Test5 extends Test1 {
-    @Override
-    @Test
-    public void withoutAnnotation() throws Exception {
+    public AndroidTestEnvironmentThrowsLinkageError(
+        @Named("runtimeSdk") Sdk runtimeSdk,
+        @Named("compileSdk") Sdk compileSdk,
+        ShadowProvider[] shadowProviders,
+        TestEnvironmentLifecyclePlugin[] lifecyclePlugins) {
+      super(runtimeSdk, compileSdk, shadowProviders, lifecyclePlugins);
     }
 
     @Override
-    @Test
-    @Config
-    public void withDefaultsAnnotation() throws Exception {
+    public void setUpApplicationState(
+        String tmpDirName, Configuration configuration, AndroidManifest appManifest) {
+      UnloadableClass.doStuff();
     }
 
     @Override
+    public void resetState() {}
+  }
+
+  @Ignore
+  public static class TestWithOldSdk {
+    @Config(sdk = Build.VERSION_CODES.HONEYCOMB)
     @Test
-    @Config(sdk = 14, shadows = Test5.class, instrumentedPackages = "com.example.method5", packageName = "com.example.test", qualifiers = "from-method5", assetDir = "method5/assets", constants = BuildConfigConstants5.class)
-    public void withOverrideAnnotation() throws Exception {
+    public void oldSdkMethod() {
+      fail("I should not be run!");
+    }
+
+    @Ignore("This test shouldn't run, and shouldn't cause the test runner to fail")
+    @Config(sdk = Build.VERSION_CODES.HONEYCOMB)
+    @Test
+    public void ignoredOldSdkMethod() {
+      fail("I should not be run!");
     }
   }
 
-  public static class BuildConfigConstants {}
-  public static class BuildConfigConstants2 {}
-  public static class BuildConfigConstants3 {}
-  public static class BuildConfigConstants4 {}
-  public static class BuildConfigConstants5 {}
-  public static class BuildConfigConstants6 {}
+  @Ignore
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  @Config(qualifiers = "w123dp-h456dp-land-hdpi")
+  public static class TestWithTwoMethods {
+    @Test
+    public void first() throws Exception {}
 
+    @Test
+    public void second() throws Exception {}
+  }
 
   @Ignore
-  @Config(qualifiers = "from-class6", shadows = Test6.class, instrumentedPackages = "com.example.test6", resourceDir = "class6/res", constants = BuildConfigConstants6.class)
-  public static class Test6 extends Test5 {
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  public static class TestThatFails {
+    @Test
+    public void first() throws Exception {
+      throw new AssertionError();
+    }
   }
 
-  private String stringify(Config config) {
-    int[] sdk = config.sdk();
-    String manifest = config.manifest();
-    Class<? extends Application> application = config.application();
-    String packageName = config.packageName();
-    String qualifiers = config.qualifiers();
-    String resourceDir = config.resourceDir();
-    String assetsDir = config.assetDir();
-    Class<?>[] shadows = config.shadows();
-    String[] instrumentedPackages = config.instrumentedPackages();
-    String[] libraries = config.libraries();
-    Class<?> constants = config.constants();
-    return stringify(sdk, manifest, application, packageName, qualifiers, resourceDir, assetsDir, shadows, instrumentedPackages, libraries, constants);
+  @Ignore
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  @Config(application = TestWithBrokenAppCreate.MyTestApplication.class)
+  @LazyApplication(LazyLoad.OFF)
+  public static class TestWithBrokenAppCreate {
+    @Test
+    public void first() throws Exception {}
+
+    @Test
+    public void second() throws Exception {}
+
+    public static class MyTestApplication extends Application {
+      @SuppressLint("MissingSuperCall")
+      @Override
+      public void onCreate() {
+        throw new RuntimeException("fake error in application.onCreate");
+      }
+    }
   }
 
-  private String stringify(int[] sdk, String manifest, Class<? extends Application> application, String packageName, String qualifiers, String resourceDir, String assetsDir, Class<?>[] shadows, String[] instrumentedPackages, String[] libraries, Class<?> constants) {
-      String[] stringClasses = new String[shadows.length];
-      for (int i = 0; i < stringClasses.length; i++) {
-          stringClasses[i] = shadows[i].toString();
+  @Ignore
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  @Config(application = TestWithBrokenAppTerminate.MyTestApplication.class)
+  @LazyApplication(LazyLoad.OFF)
+  public static class TestWithBrokenAppTerminate {
+    @Test
+    public void first() throws Exception {}
+
+    @Test
+    public void second() throws Exception {}
+
+    public static class MyTestApplication extends Application {
+      @SuppressLint("MissingSuperCall")
+      @Override
+      public void onTerminate() {
+        throw new RuntimeException("fake error in application.onTerminate");
+      }
+    }
+  }
+
+  @Ignore
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  public static class TestWithInterrupt {
+    @Test
+    public void first() throws Exception {
+      Thread.currentThread().interrupt();
+    }
+
+    @Test
+    public void second() throws Exception {
+      TempDirectory tempDirectory = new TempDirectory("test");
+
+      try {
+        Path jarPath = tempDirectory.create("some-jar").resolve("some.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jarPath))) {
+          out.putNextEntry(new JarEntry("README.txt"));
+          out.write("hi!".getBytes(StandardCharsets.UTF_8));
+        }
+
+        FileSystemProvider jarFSP =
+            FileSystemProvider.installedProviders().stream()
+                .filter(p -> p.getScheme().equals("jar"))
+                .findFirst()
+                .get();
+        Path fakeJarFile = Paths.get(jarPath.toUri());
+
+        // if Thread.interrupted() was true, this would fail in AbstractInterruptibleChannel:
+        jarFSP.newFileSystem(fakeJarFile, new HashMap<>());
+      } finally {
+        tempDirectory.destroy();
       }
 
-      Arrays.sort(stringClasses);
-
-      String[] sortedLibraries = libraries.clone();
-      Arrays.sort(sortedLibraries);
-
-      String[] sortedInstrumentedPackages = instrumentedPackages.clone();
-      Arrays.sort(sortedInstrumentedPackages);
-
-      return "sdk=" + Arrays.toString(sdk) + "\n" +
-        "manifest=" + manifest + "\n" +
-        "application=" + application + "\n" +
-        "packageName=" + packageName + "\n" +
-        "qualifiers=" + qualifiers + "\n" +
-        "resourceDir=" + resourceDir + "\n" +
-        "assetDir=" + assetsDir + "\n" +
-        "shadows=" + Arrays.toString(stringClasses) + "\n" +
-        "instrumentedPackages" + Arrays.toString(sortedInstrumentedPackages) + "\n" +
-        "libraries=" + Arrays.toString(sortedLibraries) + "\n" +
-        "constants=" + constants;
+      fail("failed for the right reason");
+    }
   }
 
-  private Properties properties(String s) throws IOException {
-    StringReader reader = new StringReader(s);
-    Properties properties = new Properties();
-    properties.load(reader);
-    return properties;
+  /** Fixture for #shouldDiagnoseUnexecutedRunnables() */
+  @Ignore
+  @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+  public static class TestWithUnexecutedRunnables {
+
+    @Test
+    public void failWithUnexecutedRunnables() {
+      shadowMainLooper().pause();
+      new Handler(Looper.getMainLooper()).post(() -> {});
+      fail("failing with unexecuted runnable");
+    }
+
+    @Test
+    public void failWithNoRunnables() {
+      fail("failing with no runnables");
+    }
+
+    @Test
+    public void assumptionViolationWithUnexecutedRunnables() {
+      shadowMainLooper().pause();
+      new Handler(Looper.getMainLooper()).post(() -> {});
+      throw new AssumptionViolatedException("assumption violated");
+    }
+
+    @Test
+    public void assumptionViolationWithNoRunnables() {
+      throw new AssumptionViolatedException("assumption violated");
+    }
+  }
+
+  /** Ignore the value of --Drobolectric.enabledSdks */
+  public static class AllEnabledSdkPicker extends DefaultSdkPicker {
+    @Inject
+    public AllEnabledSdkPicker(@Nonnull SdkCollection sdkCollection) {
+      super(sdkCollection, (String) null);
+    }
+  }
+
+  private class MyRunListener extends RunListener {
+
+    @Override
+    public void testRunStarted(Description description) {
+      events.add("run started: " + description.getMethodName());
+    }
+
+    @Override
+    public void testRunFinished(Result result) {
+      events.add("run finished: " + result);
+    }
+
+    @Override
+    public void testStarted(Description description) {
+      events.add("started: " + description.getMethodName());
+    }
+
+    @Override
+    public void testFinished(Description description) {
+      events.add("finished: " + description.getMethodName());
+    }
+
+    @Override
+    public void testAssumptionFailure(Failure failure) {
+      events.add(
+          "ignored: " + failure.getDescription().getMethodName() + ": " + failure.getMessage());
+    }
+
+    @Override
+    public void testIgnored(Description description) {
+      events.add("ignored: " + description.getMethodName());
+    }
+
+    @Override
+    public void testFailure(Failure failure) {
+      Throwable exception = failure.getException();
+      StringBuilder message = new StringBuilder();
+      if (exception.getMessage() == null) {
+        message.append(exception);
+      } else {
+        message.append(exception.getMessage());
+      }
+      for (Throwable suppressed : exception.getSuppressed()) {
+        message.append("\nSuppressed: ").append(suppressed.getMessage());
+      }
+      events.add("failure: " + message);
+    }
+  }
+
+  @Test
+  public void shouldReportExceptionsInBeforeClass() throws Exception {
+    RobolectricTestRunner runner =
+        new SingleSdkRobolectricTestRunner(TestWithBeforeClassThatThrowsRuntimeException.class);
+    runner.run(notifier);
+    assertThat(events.get(1)).startsWith("failure: fail");
+  }
+
+  @Ignore
+  public static class TestWithBeforeClassThatThrowsRuntimeException {
+    @BeforeClass
+    public static void beforeClass() {
+      throw new RuntimeException("fail");
+    }
+
+    @Test
+    public void test() {}
   }
 }

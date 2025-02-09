@@ -1,264 +1,66 @@
 package org.robolectric.shadows;
 
-import android.app.Activity;
-import android.content.res.ColorStateList;
+import static android.os.Build.VERSION_CODES.N_MR1;
+import static android.os.Build.VERSION_CODES.Q;
+import static android.os.Build.VERSION_CODES.S;
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.Shadows.shadowOf;
+
+import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
-import android.graphics.drawable.AnimationDrawable;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.NinePatchDrawable;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.util.AttributeSet;
-import android.util.DisplayMetrics;
+import android.util.SparseIntArray;
 import android.util.TypedValue;
-
-import com.google.common.collect.ImmutableMap;
-import org.assertj.core.data.Offset;
-import org.jetbrains.annotations.NotNull;
+import android.widget.RemoteViews;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import com.google.common.collect.Range;
+import java.io.InputStream;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.R;
 import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 import org.robolectric.annotation.Config;
-import org.robolectric.res.AttrData;
-import org.robolectric.res.DrawableNode;
-import org.robolectric.res.Plural;
-import org.robolectric.res.ResName;
-import org.robolectric.res.ResType;
-import org.robolectric.res.ResourceExtractor;
-import org.robolectric.res.ResourceIndex;
-import org.robolectric.res.ResourceLoader;
-import org.robolectric.res.ResourcePath;
-import org.robolectric.res.TypedResource;
-import org.robolectric.res.builder.XmlBlock;
-import org.robolectric.util.ReflectionHelpers;
-import org.robolectric.util.TestUtil;
-import org.xmlpull.v1.XmlPullParser;
+import org.robolectric.annotation.ResourcesMode;
+import org.robolectric.annotation.ResourcesMode.Mode;
 
-import java.io.File;
-import java.io.InputStream;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
-@Config(sdk = {
-    Build.VERSION_CODES.LOLLIPOP })
+@RunWith(AndroidJUnit4.class)
+@ResourcesMode(Mode.BINARY)
 public class ShadowResourcesTest {
+  private static final int FIRST_RESOURCE_COLOR_ID = android.R.color.system_neutral1_0;
+  private static final int LAST_RESOURCE_COLOR_ID = android.R.color.system_accent3_1000;
+
+  /**
+   * Some green/blue colors, from system_neutral1_0 to system_accent3_1000, extracted using 0xB1EBFF
+   * as seed color and "FRUIT_SALAD" as theme style.
+   */
+  private static final int[] greenBlueColorBase = {
+    -1, -393729, -1641480, -2562838, -4405043, -6181454, -7892073, -9668483, -11181979, -12760755,
+    -14208458, -15590111, -16777216, -1, -393729, -2296322, -3217680, -4994349, -6770760, -8547171,
+    -10257790, -11836822, -13350318, -14863301, -16376283, -16777216, -1, -720905, -4456478,
+    -8128307, -10036302, -12075112, -14638210, -16742810, -16749487, -16756420, -16762839,
+    -16768746, -16777216, -1, -720905, -4456478, -5901613, -7678281, -9454947, -11231613, -13139095,
+    -15111342, -16756420, -16762839, -16768746, -16777216, -1, -393729, -2361857, -5051393,
+    -7941655, -9783603, -11625551, -13729642, -16750723, -16757153, -16763326, -16769241, -16777216
+  };
+
   private Resources resources;
 
   @Before
   public void setup() throws Exception {
-    resources = RuntimeEnvironment.application.getResources();
-  }
-
-  @Test
-  public void getString() throws Exception {
-    assertThat(resources.getString(R.string.hello)).isEqualTo("Hello");
-    assertThat(resources.getString(R.string.say_it_with_item)).isEqualTo("flowers");
-  }
-
-  @Test
-  public void getString_withReference() throws Exception {
-    assertThat(resources.getString(R.string.greeting)).isEqualTo("Howdy");
-  }
-
-  @Test
-  public void getString_withInterpolation() throws Exception {
-    assertThat(resources.getString(R.string.interpolate, "value")).isEqualTo("Here is a value!");
-  }
-
-  @Test
-  public void getString_withHtml() throws Exception {
-    assertThat(resources.getString(R.string.some_html, "value")).isEqualTo("Hello, world");
-  }
-
-  @Test
-  public void getString_withSurroundingQuotes() throws Exception {
-    assertThat(resources.getString(R.string.surrounding_quotes, "value")).isEqualTo("This'll work");
-  }
-
-  @Test
-  public void getStringWithEscapedApostrophes() throws Exception {
-    assertThat(resources.getString(R.string.escaped_apostrophe)).isEqualTo("This'll also work");
-  }
-
-  @Test
-  public void getStringWithEscapedQuotes() throws Exception {
-    assertThat(resources.getString(R.string.escaped_quotes)).isEqualTo("Click \"OK\"");
-  }
-
-  @Test
-  public void getStringShouldStripNewLines() {
-    assertThat(resources.getString(R.string.leading_and_trailing_new_lines)).isEqualTo("Some text");
-  }
-
-  @Test
-  public void preserveEscapedNewlineAndTab() {
-    assertThat(resources.getString(R.string.new_lines_and_tabs, 4)).isEqualTo("4\tmph\nfaster");
-  }
-
-  @Test
-  public void getStringShouldConvertCodePoints() {
-    assertThat(resources.getString(R.string.non_breaking_space)).isEqualTo("Closing soon:\u00A05pm");
-    assertThat(resources.getString(R.string.space)).isEqualTo("Closing soon: 5pm");
-  }
-
-  @Test
-  public void getText_withHtml() throws Exception {
-    assertThat(resources.getText(R.string.some_html, "value")).isEqualTo("Hello, world");
-  }
-
-  @Test
-  public void getText_withLayoutId() throws Exception {
-    assertThat(resources.getText(R.layout.different_screen_sizes, "value")).isEqualTo("." + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + "res" + File.separator + "layout" + File.separator + "different_screen_sizes.xml");
-  }
-
-  @Test
-  public void getStringArray() throws Exception {
-    assertThat(resources.getStringArray(R.array.items)).isEqualTo(new String[]{"foo", "bar"});
-    assertThat(resources.getStringArray(R.array.greetings)).isEqualTo(new String[]{"hola", "Hello"});
-  }
-
-  @Test
-  public void getInt() throws Exception {
-    assertThat(resources.getInteger(R.integer.meaning_of_life)).isEqualTo(42);
-    assertThat(resources.getInteger(R.integer.test_integer1)).isEqualTo(2000);
-    assertThat(resources.getInteger(R.integer.test_integer2)).isEqualTo(9);
-    assertThat(resources.getInteger(R.integer.test_large_hex)).isEqualTo(-65536);
-    assertThat(resources.getInteger(R.integer.test_value_with_zero)).isEqualTo(7210);
-    assertThat(resources.getInteger(R.integer.meaning_of_life_as_item)).isEqualTo(42);
-  }
-
-  @Test
-  public void getInt_withReference() throws Exception {
-    assertThat(resources.getInteger(R.integer.reference_to_meaning_of_life)).isEqualTo(42);
-  }
-
-  @Test
-  public void getIntArray() throws Exception {
-    assertThat(resources.getIntArray(R.array.empty_int_array)).isEqualTo(new int[]{});
-    assertThat(resources.getIntArray(R.array.zero_to_four_int_array)).isEqualTo(new int[]{0, 1, 2, 3, 4});
-    assertThat(resources.getIntArray(R.array.with_references_int_array)).isEqualTo(new int[]{0, 2000, 1});
-    assertThat(resources.getIntArray(R.array.referenced_colors_int_array)).isEqualTo(new int[]{0x1, 0xFFFFFFFF, 0xFF000000, 0xFFF5F5F5, 0x802C76AD});
-  }
-
-  @Test
-  public void getBoolean() throws Exception {
-    assertThat(resources.getBoolean(R.bool.false_bool_value)).isEqualTo(false);
-    assertThat(resources.getBoolean(R.bool.integers_are_true)).isEqualTo(true);
-    assertThat(resources.getBoolean(R.bool.true_as_item)).isEqualTo(true);
-  }
-
-  @Test
-  public void getBoolean_withReference() throws Exception {
-    assertThat(resources.getBoolean(R.bool.reference_to_true)).isEqualTo(true);
-  }
-
-  @Test
-  public void getDimension() throws Exception {
-    assertThat(resources.getDimension(R.dimen.test_dip_dimen)).isEqualTo(20f);
-    assertThat(resources.getDimension(R.dimen.test_dp_dimen)).isEqualTo(8f);
-    assertThat(resources.getDimension(R.dimen.test_in_dimen)).isEqualTo(99f * 240);
-    assertThat(resources.getDimension(R.dimen.test_mm_dimen)).isEqualTo(((float) (42f / 25.4 * 240)));
-    assertThat(resources.getDimension(R.dimen.test_px_dimen)).isEqualTo(15f);
-    assertThat(resources.getDimension(R.dimen.test_pt_dimen)).isEqualTo(12 / 0.3f);
-    assertThat(resources.getDimension(R.dimen.test_sp_dimen)).isEqualTo(5);
-  }
-
-  @Test
-  public void getDimensionPixelSize() throws Exception {
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_dip_dimen)).isEqualTo(20);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_dp_dimen)).isEqualTo(8);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_in_dimen)).isEqualTo(99 * 240);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_mm_dimen)).isEqualTo(397);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_px_dimen)).isEqualTo(15);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_pt_dimen)).isEqualTo(40);
-    assertThat(resources.getDimensionPixelSize(R.dimen.test_sp_dimen)).isEqualTo(5);
-  }
-
-  @Test
-  public void getDimensionPixelOffset() throws Exception {
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_dip_dimen)).isEqualTo(20);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_dp_dimen)).isEqualTo(8);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_in_dimen)).isEqualTo(99 * 240);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_mm_dimen)).isEqualTo(396);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_px_dimen)).isEqualTo(15);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_pt_dimen)).isEqualTo(40);
-    assertThat(resources.getDimensionPixelOffset(R.dimen.test_sp_dimen)).isEqualTo(5);
-  }
-
-  @Test
-  public void getDimension_withReference() throws Exception {
-    assertThat(resources.getBoolean(R.bool.reference_to_true)).isEqualTo(true);
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void getStringArray_shouldThrowExceptionIfNotFound() throws Exception {
-    resources.getStringArray(-1);
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void getIntegerArray_shouldThrowExceptionIfNotFound() throws Exception {
-    resources.getIntArray(-1);
-  }
-
-  @Test
-  public void getQuantityString() throws Exception {
-    assertThat(resources.getQuantityString(R.plurals.beer, 0)).isEqualTo("Howdy");
-    assertThat(resources.getQuantityString(R.plurals.beer, 1)).isEqualTo("One beer");
-    assertThat(resources.getQuantityString(R.plurals.beer, 2)).isEqualTo("Two beers");
-    assertThat(resources.getQuantityString(R.plurals.beer, 3)).isEqualTo("%d beers, yay!");
-  }
-
-  @Test
-  public void getFraction() throws Exception {
-    final int myself = 300;
-    final int myParent = 600;
-    assertThat(resources.getFraction(R.fraction.half, myself, myParent)).isEqualTo(150f);
-    assertThat(resources.getFraction(R.fraction.half_of_parent, myself, myParent)).isEqualTo(300f);
-
-    assertThat(resources.getFraction(R.fraction.quarter_as_item, myself, myParent)).isEqualTo(75f);
-    assertThat(resources.getFraction(R.fraction.quarter_of_parent_as_item, myself, myParent)).isEqualTo(150f);
-
-    assertThat(resources.getFraction(R.fraction.fifth_as_reference, myself, myParent)).isEqualTo(60f, Offset.offset(0.01f));
-    assertThat(resources.getFraction(R.fraction.fifth_of_parent_as_reference, myself, myParent)).isEqualTo(120f, Offset.offset(0.01f));
-  }
-
-  @Test
-  public void testConfiguration() {
-    Configuration configuration = resources.getConfiguration();
-    assertThat(configuration).isNotNull();
-    assertThat(configuration.locale).isNotNull();
-  }
-
-  @Test
-  public void testConfigurationReturnsTheSameInstance() {
-    assertThat(resources.getConfiguration()).isSameAs(resources.getConfiguration());
-  }
-
-  @Test
-  public void testNewTheme() {
-    assertThat(resources.newTheme()).isNotNull();
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void testGetDrawableNullRClass() throws Exception {
-    assertThat(resources.getDrawable(-12345)).isInstanceOf(BitmapDrawable.class);
-  }
-
-  @Test
-  public void testGetAnimationDrawable() {
-    assertThat(resources.getDrawable(R.anim.animation_list)).isInstanceOf(AnimationDrawable.class);
+    resources = ApplicationProvider.getApplicationContext().getResources();
   }
 
   @Test
@@ -267,402 +69,272 @@ public class ShadowResourcesTest {
     assertThat(resources.getString(R.string.hello)).isEqualTo("Bonjour");
   }
 
+  /**
+   * Public framework symbols are defined here:
+   * https://android.googlesource.com/platform/frameworks/base/+/master/core/res/res/values/public.xml
+   * Private framework symbols are defined here:
+   * https://android.googlesource.com/platform/frameworks/base/+/master/core/res/res/values/symbols.xml
+   *
+   * <p>These generate android.R and com.android.internal.R respectively, when Framework Java code
+   * does not need to reference a framework resource it will not have an R value generated.
+   * Robolectric is then missing an identifier for this resource so we must generate a placeholder
+   * ourselves.
+   */
   @Test
-  public void testGetColorDrawable() {
-    Drawable drawable = resources.getDrawable(R.color.color_with_alpha);
-    assertThat(drawable).isInstanceOf(ColorDrawable.class);
-    assertThat(((ColorDrawable) drawable).getColor()).isEqualTo(0x802C76AD);
-  }
+  @Config(
+      sdk =
+          Build.VERSION_CODES
+              .LOLLIPOP) // android:color/secondary_text_material_dark was added in API 21
+  public void shouldGenerateIdsForResourcesThatAreMissingRValues() {
+    int identifier_missing_from_r_file =
+        resources.getIdentifier("secondary_text_material_dark", "color", "android");
 
-  @Test
-  public void getColor() {
-    assertThat(resources.getColor(R.color.color_with_alpha)).isEqualTo(0x802C76AD);
-  }
+    // We expect Robolectric to generate a placeholder identifier where one was not generated in the
+    // android R files.
+    assertThat(identifier_missing_from_r_file).isNotEqualTo(0);
 
-  @Test
-  public void getColor_withReference() {
-    assertThat(resources.getColor(R.color.background)).isEqualTo(0xfff5f5f5);
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void testGetColor_Missing() {
-    resources.getColor(R.color.test_color_1);
-  }
-
-  @Test
-  public void testGetColorStateList() {
-    assertThat(resources.getColorStateList(R.color.color_state_list)).isInstanceOf(ColorStateList.class);
-  }
-
-  @Test
-  public void testGetBitmapDrawable() {
-    assertThat(resources.getDrawable(R.drawable.an_image)).isInstanceOf(BitmapDrawable.class);
+    // We expect to be able to successfully android:color/secondary_text_material_dark to a
+    // ColorStateList.
+    assertThat(resources.getColorStateList(identifier_missing_from_r_file)).isNotNull();
   }
 
   @Test
-  public void testGetNinePatchDrawable() {
-    assertThat(resources.getDrawable(R.drawable.nine_patch_drawable)).isInstanceOf(NinePatchDrawable.class);
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void testGetBitmapDrawableForUnknownId() {
-    assertThat(resources.getDrawable(Integer.MAX_VALUE)).isInstanceOf(BitmapDrawable.class);
-  }
-
-  @Test
-  public void testGetIdentifier() throws Exception {
-
-    final String resourceType = "string";
-    final String packageName = RuntimeEnvironment.application.getPackageName();
-
-    final String resourceName = "hello";
-    final int resId1 = resources.getIdentifier(resourceName, resourceType, packageName);
-    assertThat(resId1).isEqualTo(R.string.hello);
-
-    final String typedResourceName = resourceType + "/" + resourceName;
-    final int resId2 = resources.getIdentifier(typedResourceName, resourceType, packageName);
-    assertThat(resId2).isEqualTo(R.string.hello);
-
-    final String fqn = packageName + ":" + typedResourceName;
-    final int resId3 = resources.getIdentifier(fqn, resourceType, packageName);
-    assertThat(resId3).isEqualTo(R.string.hello);
-
+  @Config(qualifiers = "fr")
+  public void openRawResource_shouldLoadDrawableWithQualifiers() {
+    InputStream resourceStream = resources.openRawResource(R.drawable.an_image);
+    Bitmap bitmap = BitmapFactory.decodeStream(resourceStream);
+    assertThat(bitmap.getHeight()).isEqualTo(100);
+    assertThat(bitmap.getWidth()).isEqualTo(100);
   }
 
   @Test
-  public void testDensity() {
-    assertThat(RuntimeEnvironment.application.getResources().getDisplayMetrics().density).isEqualTo(1f);
-
-    shadowOf(RuntimeEnvironment.application.getResources()).setDensity(1.5f);
-    assertThat(RuntimeEnvironment.application.getResources().getDisplayMetrics().density).isEqualTo(1.5f);
-
-    Activity activity = Robolectric.setupActivity(Activity.class);
-    assertThat(activity.getResources().getDisplayMetrics().density).isEqualTo(1.5f);
-  }
-
-  @Test
-  public void displayMetricsShouldNotHaveLotsOfZeros() throws Exception {
-    assertThat(RuntimeEnvironment.application.getResources().getDisplayMetrics().heightPixels).isEqualTo(800);
-    assertThat(RuntimeEnvironment.application.getResources().getDisplayMetrics().widthPixels).isEqualTo(480);
-  }
-
-  @Test
-  public void getSystemShouldReturnSystemResources() throws Exception {
-    assertThat(Resources.getSystem()).isInstanceOf(Resources.class);
-  }
-
-  @Test
-  public void multipleCallsToGetSystemShouldReturnSameInstance() throws Exception {
-    assertThat(Resources.getSystem()).isEqualTo(Resources.getSystem());
-  }
-
-  @Test
-  public void applicationResourcesShouldHaveBothSystemAndLocalValues() throws Exception {
-    assertThat(RuntimeEnvironment.application.getResources().getString(android.R.string.copy)).isEqualTo("Copy");
-    assertThat(RuntimeEnvironment.application.getResources().getString(R.string.copy)).isEqualTo("Local Copy");
-  }
-
-  @Test
-  public void systemResourcesShouldReturnCorrectSystemId() throws Exception {
-    assertThat(Resources.getSystem().getIdentifier("copy", "string", "android")).isEqualTo(android.R.string.copy);
-  }
-
-  @Test
-  public void systemResourcesShouldReturnZeroForLocalId() throws Exception {
-    assertThat(Resources.getSystem().getIdentifier("copy", "string", TestUtil.TEST_PACKAGE)).isEqualTo(0);
-  }
-
-  @Test
-  public void testGetXml() throws Exception {
-    XmlResourceParser parser = resources.getXml(R.xml.preferences);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("PreferenceScreen");
-
-    parser = resources.getXml(R.layout.custom_layout);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("org.robolectric.util.CustomView");
-
-    parser = resources.getXml(R.menu.test);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("menu");
-
-    parser = resources.getXml(R.drawable.rainbow);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("layer-list");
-
-    parser = resources.getXml(R.anim.test_anim_1);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("set");
-
-    parser = resources.getXml(R.color.color_state_list);
-    assertThat(parser).isNotNull();
-    assertThat(findRootTag(parser)).isEqualTo("selector");
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void testGetXml_nonexistentResource() {
-    resources.getXml(0);
-  }
-
-  @Test(expected = Resources.NotFoundException.class)
-  public void testGetXml_nonxmlfile() {
-    resources.getXml(R.drawable.an_image);
-  }
-
-  @Test
-  public void shouldLoadRawResources() throws Exception {
-    InputStream resourceStream = resources.openRawResource(R.raw.raw_resource);
-    assertThat(resourceStream).isNotNull();
-    assertThat(TestUtil.readString(resourceStream)).isEqualTo("raw txt file contents");
-  }
-
-  @Test
-  public void shouldLoadRawResourcesFromLibraries() throws Exception {
-    InputStream resourceStream = resources.openRawResource(R.raw.lib_raw_resource);
-    assertThat(resourceStream).isNotNull();
-    assertThat(TestUtil.readString(resourceStream)).isEqualTo("from lib3");
-  }
-
-  @Test
-  public void shouldLoadRawResourcesFromSecondaryLibraries() throws Exception {
-    InputStream resourceStream = resources.openRawResource(R.raw.lib_raw_resource_from_2);
-    assertThat(resourceStream).isNotNull();
-    assertThat(TestUtil.readString(resourceStream)).isEqualTo("I'm only defined in lib2");
-  }
-
-  @Test
-  public void shouldLoadRawResourcesFromTertiaryLibraries() throws Exception {
-    InputStream resourceStream = resources.openRawResource(R.raw.lib_raw_resource_from_3);
-    assertThat(resourceStream).isNotNull();
-    assertThat(TestUtil.readString(resourceStream)).isEqualTo("I'm only defined in lib3");
-  }
-
-  @Test
-  public void setScaledDensityShouldSetScaledDensityInDisplayMetrics() {
-    final DisplayMetrics displayMetrics = resources.getDisplayMetrics();
-
-    assertThat(displayMetrics.scaledDensity).isEqualTo(1f);
-    shadowOf(resources).setScaledDensity(2.5f);
-    assertThat(displayMetrics.scaledDensity).isEqualTo(2.5f);
-  }
-
-  @Test
-  public void getThemeValueShouldSupportDereferenceResource() {
-    TypedValue out = new TypedValue();
-
-    Resources.Theme theme = resources.newTheme();
-    theme.applyStyle(R.style.MyBlackTheme, false);
-    long internalId = getInternalId(theme);
-
-    ShadowAssetManager shadow = Shadows.shadowOf(resources.getAssets());
-    shadow.getThemeValue(internalId, android.R.attr.windowBackground, out, true);
-    assertThat(out.type).isNotEqualTo(TypedValue.TYPE_REFERENCE);
-    assertThat(out.type).isGreaterThanOrEqualTo(TypedValue.TYPE_FIRST_COLOR_INT);
-    assertThat(out.type).isLessThanOrEqualTo(TypedValue.TYPE_LAST_COLOR_INT);
-
-    TypedValue expected = new TypedValue();
-    shadow.getResourceValue(android.R.color.black, TypedValue.DENSITY_DEFAULT, expected, false);
-    assertThat(out.type).isEqualTo(expected.type);
-    assertThat(out.data).isEqualTo(expected.data);
-  }
-
-  @Test
-  public void getThemeValueShouldSupportNotDereferencingResource() {
-    TypedValue out = new TypedValue();
-
-    Resources.Theme theme = resources.newTheme();
-    theme.applyStyle(R.style.MyBlackTheme, false);
-    long internalId = getInternalId(theme);
-
-    ShadowAssetManager shadow = Shadows.shadowOf(resources.getAssets());
-    shadow.getThemeValue(internalId, android.R.attr.windowBackground, out, false);
-    assertThat(out.type).isEqualTo(TypedValue.TYPE_REFERENCE);
-    assertThat(out.resourceId).isEqualTo(android.R.color.black);
-  }
-
-  @Test
-  public void obtainStyledAttributesShouldDereferenceValues() {
-    Resources.Theme theme = resources.newTheme();
-    theme.applyStyle(R.style.MyBlackTheme, false);
-    TypedArray arr = theme.obtainStyledAttributes(new int[]{android.R.attr.windowBackground});
-    TypedValue value = new TypedValue();
-    arr.getValue(0, value);
-    arr.recycle();
-
-    assertThat(value.type).isGreaterThanOrEqualTo(TypedValue.TYPE_FIRST_COLOR_INT).isLessThanOrEqualTo(TypedValue.TYPE_LAST_INT);
-  }
-
-  public static final class Lollipop_R_snippet {
-    public static final class attr {
-      public static final int viewportHeight = 16843779;
-      public static final int viewportWidth = 16843778;
+  public void openRawResourceFd_shouldReturnsValidFdForUnCompressFile() throws Exception {
+    try (AssetFileDescriptor afd = resources.openRawResourceFd(R.raw.raw_resource)) {
+      assertThat(afd).isNotNull();
     }
   }
 
   @Test
-  public void obtainStyledAttributesShouldCheckXmlFirst() throws Exception {
+  @Config
+  public void themeResolveAttribute_shouldSupportDereferenceResource() {
+    TypedValue out = new TypedValue();
 
-    // This simulates a ResourceLoader built from a 21+ SDK as viewportHeight / viewportWidth were introduced in API 21
-    // but the public ID values they are assigned clash with private com.android.internal.R values on older SDKs. This
-    // test ensures that even on older SDKs, on calls to obtainStyledAttributes() Robolectric will first check for matching
-    // resource ID values in the AttributeSet before checking the theme.
-    Map<String, AttrData> attributesTypes = ImmutableMap.<String, AttrData>builder()
-            .put("viewportWidth", new AttrData("viewportWidth", "float", null))
-            .put("viewportHeight", new AttrData("viewportHeight", "float", null))
+    Resources.Theme theme = resources.newTheme();
+    theme.applyStyle(R.style.MyBlackTheme, false);
+
+    theme.resolveAttribute(android.R.attr.windowBackground, out, true);
+    assertThat(out.type).isNotEqualTo(TypedValue.TYPE_REFERENCE);
+    assertThat(out.type)
+        .isIn(Range.closed(TypedValue.TYPE_FIRST_COLOR_INT, TypedValue.TYPE_LAST_COLOR_INT));
+
+    int value = resources.getColor(android.R.color.black);
+    assertThat(out.data).isEqualTo(value);
+  }
+
+  @Test
+  public void themeResolveAttribute_shouldSupportNotDereferencingResource() {
+    TypedValue out = new TypedValue();
+
+    Resources.Theme theme = resources.newTheme();
+    theme.applyStyle(R.style.MyBlackTheme, false);
+
+    theme.resolveAttribute(android.R.attr.windowBackground, out, false);
+    assertThat(out.type).isEqualTo(TypedValue.TYPE_REFERENCE);
+    assertThat(out.data).isEqualTo(android.R.color.black);
+  }
+
+  @Test
+  public void obtainStyledAttributes_shouldCheckXmlFirst_fromAttributeSetBuilder() {
+
+    // This simulates a ResourceProvider built from a 21+ SDK as viewportHeight / viewportWidth were
+    // introduced in API 21 but the public ID values they are assigned clash with private
+    // com.android.internal.R values on older SDKs. This test ensures that even on older SDKs, on
+    // calls to obtainStyledAttributes() Robolectric will first check for matching resource ID
+    // values in the AttributeSet before checking the theme.
+
+    AttributeSet attributes =
+        Robolectric.buildAttributeSet()
+            .addAttribute(android.R.attr.viewportWidth, "12.0")
+            .addAttribute(android.R.attr.viewportHeight, "24.0")
             .build();
-    ResourceLoader fakeResourceLoader = new FakeResourceLoader(attributesTypes,
-            new ResourceExtractor(new ResourcePath("android", null, null, Lollipop_R_snippet.class)));
 
-
-    RuntimeEnvironment.setAppResourceLoader(fakeResourceLoader);
-
-    AttributeSet attributes = Robolectric.buildAttributeSet()
-        .addAttribute(android.R.attr.viewportWidth, "12.0")
-        .addAttribute(android.R.attr.viewportHeight, "24.0")
-        .build();
-
-    TypedArray typedArray = RuntimeEnvironment.application.getTheme().obtainStyledAttributes(attributes, new int[] {
-            Lollipop_R_snippet.attr.viewportWidth,
-            Lollipop_R_snippet.attr.viewportHeight
-    }, 0, 0);
+    TypedArray typedArray =
+        ApplicationProvider.getApplicationContext()
+            .getTheme()
+            .obtainStyledAttributes(
+                attributes,
+                new int[] {android.R.attr.viewportWidth, android.R.attr.viewportHeight},
+                0,
+                0);
     assertThat(typedArray.getFloat(0, 0)).isEqualTo(12.0f);
     assertThat(typedArray.getFloat(1, 0)).isEqualTo(24.0f);
     typedArray.recycle();
   }
 
   @Test
-  public void subClassInitializedOK() {
-    SubClassResources subClassResources = new SubClassResources(RuntimeEnvironment.application.getResources());
-    assertThat(subClassResources.openRawResource(R.raw.raw_resource)).isNotNull();
+  @Config(minSdk = N_MR1)
+  public void obtainAttributes() {
+    TypedArray typedArray =
+        resources.obtainAttributes(
+            Robolectric.buildAttributeSet()
+                .addAttribute(R.attr.styleReference, "@xml/shortcuts")
+                .build(),
+            new int[] {R.attr.styleReference});
+    assertThat(typedArray).isNotNull();
+    assertThat(typedArray.peekValue(0).resourceId).isEqualTo(R.xml.shortcuts);
   }
 
   @Test
-  public void applyStyleForced() {
-    final Resources.Theme theme = resources.newTheme();
-
-    theme.applyStyle(R.style.MyBlackTheme, true);
-    TypedArray arr = theme.obtainStyledAttributes(new int[]{android.R.attr.windowBackground, android.R.attr.textColorHint});
-
-    final TypedValue blackBackgroundColor = new TypedValue();
-    arr.getValue(0, blackBackgroundColor);
-    assertThat(blackBackgroundColor.resourceId).isEqualTo(android.R.color.black);
-    arr.recycle();
-
-    theme.applyStyle(R.style.MyBlueTheme, true);
-    arr = theme.obtainStyledAttributes(new int[]{android.R.attr.windowBackground, android.R.attr.textColor, android.R.attr.textColorHint});
-
-    final TypedValue blueBackgroundColor = new TypedValue();
-    arr.getValue(0, blueBackgroundColor);
-    assertThat(blueBackgroundColor.resourceId).isEqualTo(R.color.blue);
-
-    final TypedValue blueTextColor = new TypedValue();
-    arr.getValue(1, blueTextColor);
-    assertThat(blueTextColor.resourceId).isEqualTo(R.color.white);
-
-    final TypedValue blueTextColorHint = new TypedValue();
-    arr.getValue(2, blueTextColorHint);
-    assertThat(blueTextColorHint.resourceId).isEqualTo(android.R.color.darker_gray);
-
-    arr.recycle();
+  public void obtainAttributes_shouldUseReferencedIdFromAttributeSet() {
+    // android:id/mask was introduced in API 21, but it's still possible for apps built against API
+    // 21 to refer to it in older runtimes because referenced resource ids are compiled (by aapt)
+    // into the binary XML format.
+    AttributeSet attributeSet =
+        Robolectric.buildAttributeSet().addAttribute(android.R.attr.id, "@android:id/mask").build();
+    TypedArray typedArray = resources.obtainAttributes(attributeSet, new int[] {android.R.attr.id});
+    assertThat(typedArray.getResourceId(0, -9)).isEqualTo(android.R.id.mask);
   }
 
   @Test
-  public void applyStyleNotForced() {
-    final Resources.Theme theme = resources.newTheme();
+  public void obtainAttributes_shouldReturnValuesFromAttributeSet() {
+    AttributeSet attributes =
+        Robolectric.buildAttributeSet()
+            .addAttribute(android.R.attr.title, "A title!")
+            .addAttribute(android.R.attr.width, "12px")
+            .addAttribute(android.R.attr.height, "1in")
+            .build();
+    TypedArray typedArray =
+        resources.obtainAttributes(
+            attributes,
+            new int[] {android.R.attr.height, android.R.attr.width, android.R.attr.title});
 
-    // Apply black theme
-    theme.applyStyle(R.style.MyBlackTheme, true);
-    TypedArray arr = theme.obtainStyledAttributes(new int[]{android.R.attr.windowBackground, android.R.attr.textColorHint});
-
-    final TypedValue blackBackgroundColor = new TypedValue();
-    arr.getValue(0, blackBackgroundColor);
-    assertThat(blackBackgroundColor.resourceId).isEqualTo(android.R.color.black);
-
-    final TypedValue blackTextColorHint = new TypedValue();
-    arr.getValue(1, blackTextColorHint);
-    assertThat(blackTextColorHint.resourceId).isEqualTo(android.R.color.darker_gray);
-
-    arr.recycle();
-
-    // Apply blue theme
-    theme.applyStyle(R.style.MyBlueTheme, false);
-    arr = theme.obtainStyledAttributes(new int[]{android.R.attr.windowBackground, android.R.attr.textColor, android.R.attr.textColorHint});
-
-    final TypedValue blueBackgroundColor = new TypedValue();
-    arr.getValue(0, blueBackgroundColor);
-    assertThat(blueBackgroundColor.resourceId).isEqualTo(android.R.color.black);
-
-    final TypedValue blueTextColor = new TypedValue();
-    arr.getValue(1, blueTextColor);
-    assertThat(blueTextColor.resourceId).isEqualTo(R.color.white);
-
-    final TypedValue blueTextColorHint = new TypedValue();
-    arr.getValue(2, blueTextColorHint);
-    assertThat(blueTextColorHint.resourceId).isEqualTo(android.R.color.darker_gray);
-
-    arr.recycle();
+    assertThat(typedArray.getDimension(0, 0)).isEqualTo(160f);
+    assertThat(typedArray.getDimension(1, 0)).isEqualTo(12f);
+    assertThat(typedArray.getString(2)).isEqualTo("A title!");
+    typedArray.recycle();
   }
 
-  private long getInternalId(Resources.Theme theme) {
-    return ReflectionHelpers.getField(theme, "mTheme");
+  @Test
+  public void obtainStyledAttributesShouldCheckXmlFirst_andFollowReferences() {
+    // This simulates a ResourceProvider built from a 21+ SDK as viewportHeight / viewportWidth were
+    // introduced in API 21 but the public ID values they are assigned clash with private
+    // com.android.internal.R values on older SDKs. This test ensures that even on older SDKs,
+    // on calls to obtainStyledAttributes() Robolectric will first check for matching
+    // resource ID values in the AttributeSet before checking the theme.
+    AttributeSet attributes =
+        Robolectric.buildAttributeSet()
+            .addAttribute(android.R.attr.viewportWidth, "@integer/test_integer1")
+            .addAttribute(android.R.attr.viewportHeight, "@integer/test_integer2")
+            .build();
+
+    TypedArray typedArray =
+        ApplicationProvider.getApplicationContext()
+            .getTheme()
+            .obtainStyledAttributes(
+                attributes,
+                new int[] {android.R.attr.viewportWidth, android.R.attr.viewportHeight},
+                0,
+                0);
+    assertThat(typedArray.getFloat(0, 0)).isEqualTo(2000);
+    assertThat(typedArray.getFloat(1, 0)).isEqualTo(9);
+    typedArray.recycle();
   }
 
-  private static String findRootTag(XmlResourceParser parser) throws Exception {
-    int event;
-    do {
-      event = parser.next();
-    } while (event != XmlPullParser.START_TAG);
-    return parser.getName();
+  @Test
+  public void getAttributeSetSourceResId() {
+    XmlResourceParser xmlResourceParser = resources.getXml(R.xml.preferences);
+
+    int sourceRedId = ShadowResources.getAttributeSetSourceResId(xmlResourceParser);
+
+    assertThat(sourceRedId).isEqualTo(R.xml.preferences);
   }
 
-  private static class SubClassResources extends Resources {
-    public SubClassResources(Resources res) {
-      super(res.getAssets(), res.getDisplayMetrics(), res.getConfiguration());
-    }
+  @Test
+  public void addConfigurationChangeListener_callsOnConfigurationChange() {
+    AtomicBoolean listenerWasCalled = new AtomicBoolean();
+    shadowOf(resources)
+        .addConfigurationChangeListener(
+            (oldConfig, newConfig, newMetrics) -> {
+              listenerWasCalled.set(true);
+              assertThat(newConfig.fontScale).isEqualTo(oldConfig.fontScale * 2);
+            });
+
+    Configuration newConfig = new Configuration(resources.getConfiguration());
+    newConfig.fontScale *= 2;
+    resources.updateConfiguration(newConfig, resources.getDisplayMetrics());
+
+    assertThat(listenerWasCalled.get()).isTrue();
   }
 
-  private static class FakeResourceLoader extends ResourceLoader {
-    private final Map<String, AttrData> attributesTypes;
-    private final ResourceIndex resourceIndex;
+  @Test
+  public void removeConfigurationChangeListener_doesNotCallOnConfigurationChange() {
+    AtomicBoolean listenerWasCalled = new AtomicBoolean();
+    ShadowResources.OnConfigurationChangeListener listener =
+        (oldConfig, newConfig, newMetrics) -> listenerWasCalled.set(true);
+    Configuration newConfig = new Configuration(resources.getConfiguration());
+    newConfig.fontScale *= 2;
 
-    public FakeResourceLoader(Map<String, AttrData> attributesTypes, ResourceIndex resourceIndex) {
-      this.attributesTypes = attributesTypes;
-      this.resourceIndex = resourceIndex;
-    }
+    shadowOf(resources).addConfigurationChangeListener(listener);
+    shadowOf(resources).removeConfigurationChangeListener(listener);
+    resources.updateConfiguration(newConfig, resources.getDisplayMetrics());
 
-    @Override
-    public TypedResource getValue(@NotNull ResName resName, String qualifiers) {
-      return new TypedResource<>(attributesTypes.get(resName.name), ResType.FLOAT);
-    }
+    assertThat(listenerWasCalled.get()).isFalse();
+  }
 
-    @Override
-    public Plural getPlural(ResName resName, int quantity, String qualifiers) {
-      return null;
-    }
+  @Test
+  public void subclassWithNpeGetConfiguration_constructsCorrectly() {
+    // Simulate the behavior of ResourcesWrapper during construction which will throw an NPE if
+    // getConfiguration is called, on lower SDKs the Configuration constructor calls
+    // updateConfiguration(), the ShadowResources will attempt to call getConfiguration during this
+    // method call and shouldn't fail.
+    Resources resourcesSubclass =
+        new Resources(
+            resources.getAssets(), resources.getDisplayMetrics(), resources.getConfiguration()) {
+          @Override
+          public Configuration getConfiguration() {
+            throw new NullPointerException();
+          }
+        };
 
-    @Override
-    public XmlBlock getXml(ResName resName, String qualifiers) {
-      return null;
-    }
+    assertThat(resourcesSubclass).isNotNull();
+  }
 
-    @Override
-    public DrawableNode getDrawableNode(ResName resName, String qualifiers) {
-      return null;
-    }
+  @Test
+  @Config(minSdk = S)
+  public void getColor_shouldReturnCorrectMaterialYouColor() {
+    SparseIntArray sparseArray =
+        new SparseIntArray(LAST_RESOURCE_COLOR_ID - FIRST_RESOURCE_COLOR_ID + 1);
+    IntStream.range(0, greenBlueColorBase.length)
+        .forEach(i -> sparseArray.put(FIRST_RESOURCE_COLOR_ID + i, greenBlueColorBase[i]));
+    int basicColor = android.R.color.system_neutral1_10;
+    Context context = ApplicationProvider.getApplicationContext();
+    RemoteViews.ColorResources colorResources =
+        RemoteViews.ColorResources.create(context, sparseArray);
+    assertThat(colorResources).isNotNull();
 
-    @Override
-    public InputStream getRawValue(ResName resName) {
-      return null;
-    }
+    colorResources.apply(context);
 
-    @Override
-    public ResourceIndex getResourceIndex() {
-      return resourceIndex;
-    }
+    assertThat(basicColor).isNotEqualTo(0);
+    assertThat(resources.getColor(basicColor, /* theme= */ null)).isEqualTo(-393729);
+  }
 
-    @Override
-    public boolean providesFor(String namespace) {
-      return false;
+  @Ignore("Re-enable when performing benchmarks")
+  @Test
+  @Config(sdk = Q)
+  public void benchmarkUpdateConfiguration() {
+    long startTime = System.nanoTime();
+    Resources systemResources = Resources.getSystem();
+    for (int i = 0; i < 10_000; i++) {
+      Configuration oldConfig = resources.getConfiguration();
+      Configuration newConfig = new Configuration(oldConfig);
+      // This change triggers RebuildFilterList in CppAssetManager2
+      newConfig.colorMode = 3;
+      systemResources.updateConfiguration(newConfig, resources.getDisplayMetrics());
+      systemResources.updateConfiguration(oldConfig, resources.getDisplayMetrics());
     }
+    long endTime = System.nanoTime();
+    long elapsedNs = endTime - startTime;
+    System.err.println(
+        "updateConfiguration benchmark took " + TimeUnit.NANOSECONDS.toMillis(elapsedNs) + " ms");
   }
 }

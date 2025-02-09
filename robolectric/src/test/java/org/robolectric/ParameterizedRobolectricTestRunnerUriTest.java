@@ -1,14 +1,13 @@
 package org.robolectric;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.net.Uri;
+import java.util.Arrays;
+import java.util.Collection;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.annotation.Config;
-
-import java.util.Arrays;
-import java.util.Collection;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Parameterized tests using an Android class.
@@ -22,9 +21,8 @@ public final class ParameterizedRobolectricTestRunnerUriTest {
   private final String resourcePath;
   private final Uri expectedUri;
 
-  public ParameterizedRobolectricTestRunnerUriTest(String basePath,
-                                                   String resourcePath,
-                                                   String expectedUri) {
+  public ParameterizedRobolectricTestRunnerUriTest(
+      String basePath, String resourcePath, String expectedUri) {
     this.basePath = basePath;
     this.resourcePath = resourcePath;
     this.expectedUri = Uri.parse(expectedUri);
@@ -37,12 +35,12 @@ public final class ParameterizedRobolectricTestRunnerUriTest {
   }
 
   @ParameterizedRobolectricTestRunner.Parameters(name = "URI Test: {0} + {1}")
-  public static Collection getTestData() {
+  public static Collection<?> getTestData() {
     Object[][] data = {
-        { "http://host", "resource", "http://host/resource" },
-        { "http://host/", "resource", "http://host/resource" },
-        { "http://host", "/resource", "http://host/resource" },
-        { "http://host/", "/resource", "http://host/resource" }
+      {"http://host", "resource", "http://host/resource"},
+      {"http://host/", "resource", "http://host/resource"},
+      {"http://host", "/resource", "http://host/resource"},
+      {"http://host/", "/resource", "http://host/resource"}
     };
     return Arrays.asList(data);
   }

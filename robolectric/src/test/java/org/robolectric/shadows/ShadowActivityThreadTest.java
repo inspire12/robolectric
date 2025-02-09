@@ -1,26 +1,29 @@
 package org.robolectric.shadows;
 
-import android.content.Context;
-import android.content.pm.PackageManager;
+import static com.google.common.truth.Truth.assertThat;
 
-import org.junit.Assert;
+import android.app.ActivityThread;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
+import org.robolectric.annotation.experimental.LazyApplication;
+import org.robolectric.annotation.experimental.LazyApplication.LazyLoad;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+/** Tests for the ShadowActivityThread class. */
+@RunWith(AndroidJUnit4.class)
 public class ShadowActivityThreadTest {
-    @Test
-    public void testTriggersUndeclaredThrowableException() throws Exception {
-        // createPackageContext internally calls ActivityThread.getPackageInfo which is what we'd like to test here.
-        try {
-            RuntimeEnvironment.application.createPackageContext("com.unknownpackage.ab", Context.CONTEXT_RESTRICTED);
-            Assert.fail("Should've triggered a NameNotFoundException and not UndeclaredThrowableException");
-        } catch (PackageManager.NameNotFoundException nnfe) {
-            assertThat(nnfe).hasMessageContaining("com.unknownpackage.ab");
-        }
-    }
+
+  @LazyApplication(LazyLoad.ON)
+  @Test
+  public void currentApplicationIsLazyLoaded() {
+    RuntimeEnvironment.application = null;
+    assertThat(ShadowActivityThread.currentApplication()).isNotNull();
+  }
+
+  @Test
+  public void getApplication() {
+    ActivityThread activityThread = (ActivityThread) ShadowActivityThread.currentActivityThread();
+    assertThat(activityThread.getApplication()).isEqualTo(RuntimeEnvironment.getApplication());
+  }
 }

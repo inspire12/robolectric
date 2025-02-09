@@ -1,28 +1,28 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.database.sqlite.SQLiteOpenHelper;
-
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class SQLiteOpenHelperTest {
 
   private TestOpenHelper helper;
 
   @Before
-  public void setUp() throws Exception {
-    helper = new TestOpenHelper(RuntimeEnvironment.application, "path", null, 1);
+  public void setUp() {
+    helper = new TestOpenHelper(ApplicationProvider.getApplicationContext(), "path", null, 1);
   }
 
   @After
@@ -31,21 +31,22 @@ public class SQLiteOpenHelperTest {
   }
 
   @Test
-  public void testConstructorWithNullPathShouldCreateInMemoryDatabase() throws Exception {
+  public void testConstructorWithNullPathShouldCreateInMemoryDatabase() {
     TestOpenHelper helper = new TestOpenHelper(null, null, null, 1);
     SQLiteDatabase database = helper.getReadableDatabase();
     assertDatabaseOpened(database, helper);
     assertInitialDB(database, helper);
+    helper.close();
   }
 
   @Test
-  public void testInitialGetReadableDatabase() throws Exception {
+  public void testInitialGetReadableDatabase() {
     SQLiteDatabase database = helper.getReadableDatabase();
     assertInitialDB(database, helper);
   }
 
   @Test
-  public void testSubsequentGetReadableDatabase() throws Exception {
+  public void testSubsequentGetReadableDatabase() {
     helper.getReadableDatabase();
     helper.close();
     SQLiteDatabase database = helper.getReadableDatabase();
@@ -54,21 +55,21 @@ public class SQLiteOpenHelperTest {
   }
 
   @Test
-  public void testSameDBInstanceSubsequentGetReadableDatabase() throws Exception {
+  public void testSameDBInstanceSubsequentGetReadableDatabase() {
     SQLiteDatabase db1 = helper.getReadableDatabase();
     SQLiteDatabase db2 = helper.getReadableDatabase();
 
-    assertThat(db1).isSameAs(db2);
+    assertThat(db1).isSameInstanceAs(db2);
   }
 
   @Test
-  public void testInitialGetWritableDatabase() throws Exception {
+  public void testInitialGetWritableDatabase() {
     SQLiteDatabase database = helper.getWritableDatabase();
     assertInitialDB(database, helper);
   }
 
   @Test
-  public void testSubsequentGetWritableDatabase() throws Exception {
+  public void testSubsequentGetWritableDatabase() {
     helper.getWritableDatabase();
     helper.close();
 
@@ -76,15 +77,15 @@ public class SQLiteOpenHelperTest {
   }
 
   @Test
-  public void testSameDBInstanceSubsequentGetWritableDatabase() throws Exception {
+  public void testSameDBInstanceSubsequentGetWritableDatabase() {
     SQLiteDatabase db1 = helper.getWritableDatabase();
     SQLiteDatabase db2 = helper.getWritableDatabase();
 
-    assertThat(db1).isSameAs(db2);
+    assertThat(db1).isSameInstanceAs(db2);
   }
 
   @Test
-  public void testClose() throws Exception {
+  public void testClose() {
     SQLiteDatabase database = helper.getWritableDatabase();
 
     assertThat(database.isOpen()).isTrue();
@@ -93,21 +94,28 @@ public class SQLiteOpenHelperTest {
   }
 
   @Test
-  public void testGetPath() throws Exception {
+  public void testGetPath() {
     final String path1 = "path1", path2 = "path2";
 
-    TestOpenHelper helper1 = new TestOpenHelper(RuntimeEnvironment.application, path1, null, 1);
-    String expectedPath1 = RuntimeEnvironment.application.getDatabasePath(path1).getAbsolutePath();
+    TestOpenHelper helper1 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), path1, null, 1);
+    String expectedPath1 =
+        ApplicationProvider.getApplicationContext().getDatabasePath(path1).getAbsolutePath();
     assertThat(helper1.getReadableDatabase().getPath()).isEqualTo(expectedPath1);
 
-    TestOpenHelper helper2 = new TestOpenHelper(RuntimeEnvironment.application, path2, null, 1);
-    String expectedPath2 = RuntimeEnvironment.application.getDatabasePath(path2).getAbsolutePath();
+    TestOpenHelper helper2 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), path2, null, 1);
+    String expectedPath2 =
+        ApplicationProvider.getApplicationContext().getDatabasePath(path2).getAbsolutePath();
     assertThat(helper2.getReadableDatabase().getPath()).isEqualTo(expectedPath2);
+    helper1.close();
+    helper2.close();
   }
 
   @Test
-  public void testCloseMultipleDbs() throws Exception {
-    TestOpenHelper helper2 = new TestOpenHelper(RuntimeEnvironment.application, "path2", null, 1);
+  public void testCloseMultipleDbs() {
+    TestOpenHelper helper2 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), "path2", null, 1);
     SQLiteDatabase database1 = helper.getWritableDatabase();
     SQLiteDatabase database2 = helper2.getWritableDatabase();
     assertThat(database1.isOpen()).isTrue();
@@ -120,8 +128,9 @@ public class SQLiteOpenHelperTest {
   }
 
   @Test
-  public void testOpenMultipleDbsOnCreate() throws Exception {
-    TestOpenHelper helper2 = new TestOpenHelper(RuntimeEnvironment.application, "path2", null, 1);
+  public void testOpenMultipleDbsOnCreate() {
+    TestOpenHelper helper2 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), "path2", null, 1);
     assertThat(helper.onCreateCalled).isFalse();
     assertThat(helper2.onCreateCalled).isFalse();
     helper.getWritableDatabase();
@@ -135,11 +144,15 @@ public class SQLiteOpenHelperTest {
   }
 
   private void setupTable(SQLiteDatabase db, String table) {
-    db.execSQL("CREATE TABLE " + table + " (" +
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-        "testVal INTEGER DEFAULT 0" +
-        ");");
+    db.execSQL(
+        "CREATE TABLE "
+            + table
+            + " ("
+            + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            + "testVal INTEGER DEFAULT 0"
+            + ");");
   }
+
   private void insertData(SQLiteDatabase db, String table, int[] values) {
     for (int i : values) {
       ContentValues cv = new ContentValues();
@@ -149,34 +162,38 @@ public class SQLiteOpenHelperTest {
   }
 
   private void verifyData(SQLiteDatabase db, String table, int expectedVals) {
-    assertThat(db.query(table, null, null, null,
-          null, null, null).getCount()).isEqualTo(expectedVals);
+    try (Cursor cursor = db.query(table, null, null, null, null, null, null)) {
+      assertThat(cursor.getCount()).isEqualTo(expectedVals);
+    }
   }
 
   @Test
-  public void testMultipleDbsPreserveData() throws Exception {
+  public void testMultipleDbsPreserveData() {
     final String TABLE_NAME1 = "fart", TABLE_NAME2 = "fart2";
     SQLiteDatabase db1 = helper.getWritableDatabase();
     setupTable(db1, TABLE_NAME1);
-    insertData(db1, TABLE_NAME1, new int[]{1, 2});
-    TestOpenHelper helper2 = new TestOpenHelper(RuntimeEnvironment.application, "path2", null, 1);
+    insertData(db1, TABLE_NAME1, new int[] {1, 2});
+    TestOpenHelper helper2 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), "path2", null, 1);
     SQLiteDatabase db2 = helper2.getWritableDatabase();
     setupTable(db2, TABLE_NAME2);
-    insertData(db2, TABLE_NAME2, new int[]{4, 5, 6});
+    insertData(db2, TABLE_NAME2, new int[] {4, 5, 6});
     verifyData(db1, TABLE_NAME1, 2);
     verifyData(db2, TABLE_NAME2, 3);
+    helper2.close();
   }
 
   @Test
-  public void testCloseOneDbKeepsDataForOther() throws Exception {
+  public void testCloseOneDbKeepsDataForOther() {
     final String TABLE_NAME1 = "fart", TABLE_NAME2 = "fart2";
-    TestOpenHelper helper2 = new TestOpenHelper(RuntimeEnvironment.application, "path2", null, 1);
+    TestOpenHelper helper2 =
+        new TestOpenHelper(ApplicationProvider.getApplicationContext(), "path2", null, 1);
     SQLiteDatabase db1 = helper.getWritableDatabase();
     SQLiteDatabase db2 = helper2.getWritableDatabase();
     setupTable(db1, TABLE_NAME1);
     setupTable(db2, TABLE_NAME2);
-    insertData(db1, TABLE_NAME1, new int[]{1, 2});
-    insertData(db2, TABLE_NAME2, new int[]{4, 5, 6});
+    insertData(db1, TABLE_NAME1, new int[] {1, 2});
+    insertData(db2, TABLE_NAME2, new int[] {4, 5, 6});
     verifyData(db1, TABLE_NAME1, 2);
     verifyData(db2, TABLE_NAME2, 3);
     db1.close();
@@ -184,21 +201,22 @@ public class SQLiteOpenHelperTest {
     db1 = helper.getWritableDatabase();
     verifyData(db1, TABLE_NAME1, 2);
     verifyData(db2, TABLE_NAME2, 3);
+    helper2.close();
   }
 
   @Test
-  public void testCreateAndDropTable() throws Exception {
+  public void testCreateAndDropTable() {
     SQLiteDatabase database = helper.getWritableDatabase();
     database.execSQL("CREATE TABLE foo(id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT);");
     database.execSQL("DROP TABLE IF EXISTS foo;");
   }
 
   @Test
-  public void testCloseThenOpen() throws Exception {
+  public void testCloseThenOpen() {
     final String TABLE_NAME1 = "fart";
     SQLiteDatabase db1 = helper.getWritableDatabase();
     setupTable(db1, TABLE_NAME1);
-    insertData(db1, TABLE_NAME1, new int[]{1, 2});
+    insertData(db1, TABLE_NAME1, new int[] {1, 2});
     verifyData(db1, TABLE_NAME1, 2);
     db1.close();
     db1 = helper.getWritableDatabase();
@@ -222,7 +240,7 @@ public class SQLiteOpenHelperTest {
     assertThat(helper.onUpgradeCalled).isFalse();
   }
 
-  private class TestOpenHelper extends SQLiteOpenHelper {
+  private static class TestOpenHelper extends SQLiteOpenHelper {
     public boolean onCreateCalled;
     public boolean onUpgradeCalled;
     public boolean onOpenCalled;
@@ -232,9 +250,9 @@ public class SQLiteOpenHelperTest {
     }
 
     @Override
-      public void onCreate(SQLiteDatabase database) {
-        onCreateCalled = true;
-      }
+    public void onCreate(SQLiteDatabase database) {
+      onCreateCalled = true;
+    }
 
     @Override
     public void onUpgrade(SQLiteDatabase database, int oldVersion, int newVersion) {

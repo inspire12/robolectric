@@ -1,24 +1,76 @@
 package org.robolectric.shadows;
 
-import android.os.Build;
+import static android.os.Build.VERSION_CODES.M;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
+
+import android.content.Context;
 import android.os.Debug;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.File;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 import org.robolectric.annotation.Config;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowDebugTest {
-  @Test
-  public void initNoCrash() {
-    assertThat(Debug.getNativeHeapAllocatedSize()).isNotNegative();
+
+  private static final String TRACE_FILENAME = "dmtrace.trace";
+  private Context context;
+
+  @Before
+  public void setUp() throws Exception {
+    context = ApplicationProvider.getApplicationContext();
   }
 
   @Test
-  @Config(sdk = Build.VERSION_CODES.M)
+  public void initNoCrash() {
+    assertThat(Debug.getNativeHeapAllocatedSize()).isAtLeast(0L);
+  }
+
+  @Test
+  @Config(minSdk = M)
   public void getRuntimeStats() {
     assertThat(Debug.getRuntimeStats()).isNotNull();
+  }
+
+  @Test
+  public void startStopTracingShouldWriteFile() {
+    Debug.startMethodTracing(TRACE_FILENAME);
+    Debug.stopMethodTracing();
+
+    assertThat(new File(context.getExternalFilesDir(null), TRACE_FILENAME).exists()).isTrue();
+  }
+
+  @Test
+  public void startStopTracingSamplingShouldWriteFile() {
+    Debug.startMethodTracingSampling(TRACE_FILENAME, 100, 100);
+    Debug.stopMethodTracing();
+
+    assertThat(new File(context.getExternalFilesDir(null), TRACE_FILENAME).exists()).isTrue();
+  }
+
+  @Test
+  public void startTracingShouldThrowIfAlreadyStarted() {
+    Debug.startMethodTracing(TRACE_FILENAME);
+
+    try {
+      Debug.startMethodTracing(TRACE_FILENAME);
+      fail("RuntimeException not thrown.");
+    } catch (RuntimeException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void stopTracingShouldThrowIfNotStarted() {
+    try {
+      Debug.stopMethodTracing();
+      fail("RuntimeException not thrown.");
+    } catch (RuntimeException e) {
+      // expected
+    }
   }
 }

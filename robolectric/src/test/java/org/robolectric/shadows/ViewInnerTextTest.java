@@ -1,29 +1,29 @@
 package org.robolectric.shadows;
 
+import static org.junit.Assert.assertEquals;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.content.Context;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.junit.Assert.assertEquals;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ViewInnerTextTest {
   private Context context;
 
   @Before
   public void setUp() throws Exception {
-    context = RuntimeEnvironment.application;
+    context = ApplicationProvider.getApplicationContext();
   }
 
   @Test
-  public void testInnerText() throws Exception {
+  public void testInnerText() {
     LinearLayout top = new LinearLayout(context);
     top.addView(textView("blah"));
     top.addView(new View(context));
@@ -44,7 +44,7 @@ public class ViewInnerTextTest {
   }
 
   @Test
-  public void shouldOnlyIncludeViewTextViewsText() throws Exception {
+  public void shouldOnlyIncludeViewTextViewsText() {
     LinearLayout top = new LinearLayout(context);
     top.addView(textView("blah", View.VISIBLE));
     top.addView(textView("blarg", View.GONE));
@@ -54,7 +54,7 @@ public class ViewInnerTextTest {
   }
 
   @Test
-  public void shouldNotPrefixBogusSpaces() throws Exception {
+  public void shouldNotPrefixBogusSpaces() {
     LinearLayout top = new LinearLayout(context);
     top.addView(textView("blarg", View.GONE));
     top.addView(textView("arrg", View.INVISIBLE));

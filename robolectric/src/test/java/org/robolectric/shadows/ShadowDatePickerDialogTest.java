@@ -1,50 +1,71 @@
 package org.robolectric.shadows;
 
-import android.os.Build;
-import android.widget.DatePicker;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import android.app.DatePickerDialog;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.annotation.Config;
-
-import java.lang.Override;
-import java.util.Locale;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static android.os.Build.VERSION_CODES.N;
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
-@Config(sdk = {
-    Build.VERSION_CODES.JELLY_BEAN,
-    Build.VERSION_CODES.JELLY_BEAN_MR1,
-    Build.VERSION_CODES.JELLY_BEAN_MR2,
-    // Build.VERSION_CODES.KITKAT, - Does not pass on Kit Kat
-    Build.VERSION_CODES.LOLLIPOP })
+import android.app.DatePickerDialog;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.Locale;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.annotation.Config;
+
+@RunWith(AndroidJUnit4.class)
 public class ShadowDatePickerDialogTest {
 
   @Test
-  public void returnsTheInitialYearMonthAndDayPassedIntoTheDatePickerDialog() throws Exception {
+  public void testGettersReturnInitialConstructorValues() {
     Locale.setDefault(Locale.US);
-    DatePickerDialog datePickerDialog = new DatePickerDialog(RuntimeEnvironment.application, null, 2012, 6, 7);
+    DatePickerDialog datePickerDialog =
+        new DatePickerDialog(ApplicationProvider.getApplicationContext(), null, 2012, 6, 7);
     assertThat(shadowOf(datePickerDialog).getYear()).isEqualTo(2012);
     assertThat(shadowOf(datePickerDialog).getMonthOfYear()).isEqualTo(6);
     assertThat(shadowOf(datePickerDialog).getDayOfMonth()).isEqualTo(7);
   }
 
   @Test
+  public void updateDate_shouldUpdateYearMonthAndDay() {
+    Locale.setDefault(Locale.US);
+    DatePickerDialog datePickerDialog =
+        new DatePickerDialog(ApplicationProvider.getApplicationContext(), null, 2012, 6, 7);
+    datePickerDialog.updateDate(2021, 11, 10);
+
+    assertThat(shadowOf(datePickerDialog).getYear()).isEqualTo(2021);
+    assertThat(shadowOf(datePickerDialog).getMonthOfYear()).isEqualTo(11);
+    assertThat(shadowOf(datePickerDialog).getDayOfMonth()).isEqualTo(10);
+  }
+
+  @Test
+  @Config(minSdk = N)
+  public void updateListener_shouldUpdateTheListenerPassedInto() {
+    DatePickerDialog.OnDateSetListener mockCallBack =
+        mock(DatePickerDialog.OnDateSetListener.class);
+    DatePickerDialog datePickerDialog =
+        new DatePickerDialog(ApplicationProvider.getApplicationContext(), null, 2012, 6, 7);
+    assertThat(shadowOf(datePickerDialog).getOnDateSetListenerCallback()).isNull();
+
+    // setOnDateSetListener added in Android Nougat
+    datePickerDialog.setOnDateSetListener(mockCallBack);
+
+    assertThat(shadowOf(datePickerDialog).getOnDateSetListenerCallback()).isEqualTo(mockCallBack);
+  }
+
+  @Test
   public void savesTheCallback() {
-    DatePickerDialog.OnDateSetListener expectedDateSetListener = new DatePickerDialog.OnDateSetListener() {
-      @Override
-      public void onDateSet(DatePicker datePicker, int i, int i1, int i2) {
-        // ignored
-      }
-    };
+    DatePickerDialog.OnDateSetListener expectedDateSetListener =
+        (datePicker, i, i1, i2) -> {
+          // ignored
+        };
 
-    DatePickerDialog datePickerDialog = new DatePickerDialog(RuntimeEnvironment.application, expectedDateSetListener, 2012, 6, 7);
+    DatePickerDialog datePickerDialog =
+        new DatePickerDialog(
+            ApplicationProvider.getApplicationContext(), expectedDateSetListener, 2012, 6, 7);
 
-    ShadowDatePickerDialog shadowDatePickerDialog = (ShadowDatePickerDialog) shadowOf(datePickerDialog);
-    assertThat(shadowDatePickerDialog.getOnDateSetListenerCallback()).isEqualTo(expectedDateSetListener);
+    ShadowDatePickerDialog shadowDatePickerDialog = shadowOf(datePickerDialog);
+    assertThat(shadowDatePickerDialog.getOnDateSetListenerCallback())
+        .isEqualTo(expectedDateSetListener);
   }
 }

@@ -1,17 +1,17 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.content.IntentFilter;
 import android.net.Uri;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowIntentFilterTest {
   @Test
-  public void copyConstructorTest() throws Exception {
+  public void copyConstructorTest() {
     String action = "test";
     IntentFilter intentFilter = new IntentFilter(action);
     IntentFilter copy = new IntentFilter(intentFilter);
@@ -19,14 +19,14 @@ public class ShadowIntentFilterTest {
   }
 
   @Test
-  public void setsPriority() throws Exception {
+  public void setsPriority() {
     IntentFilter filter = new IntentFilter();
     filter.setPriority(123);
     assertThat(filter.getPriority()).isEqualTo(123);
   }
 
   @Test
-  public void addDataScheme_shouldAddTheDataScheme() throws Exception {
+  public void addDataScheme_shouldAddTheDataScheme() {
     IntentFilter intentFilter = new IntentFilter();
     intentFilter.addDataScheme("http");
     intentFilter.addDataScheme("ftp");
@@ -36,7 +36,7 @@ public class ShadowIntentFilterTest {
   }
 
   @Test
-  public void addDataAuthority_shouldAddTheDataAuthority() throws Exception {
+  public void addDataAuthority_shouldAddTheDataAuthority() {
     IntentFilter intentFilter = new IntentFilter();
     intentFilter.addDataAuthority("test.com", "8080");
     intentFilter.addDataAuthority("example.com", "42");
@@ -74,7 +74,7 @@ public class ShadowIntentFilterTest {
   }
 
   @Test
-  public void hasDataType() throws IntentFilter.MalformedMimeTypeException{
+  public void hasDataType() throws IntentFilter.MalformedMimeTypeException {
     IntentFilter intentFilter = new IntentFilter();
     assertThat(intentFilter.hasDataType("image/test")).isFalse();
     intentFilter.addDataType("image/test");
@@ -90,10 +90,10 @@ public class ShadowIntentFilterTest {
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
     Uri uriTest2 = Uri.parse("http://testHost2:2");
-    assertThat(intentFilter.matchDataAuthority(uriTest1)).isEqualTo(
-        IntentFilter.MATCH_CATEGORY_HOST + IntentFilter.MATCH_CATEGORY_PORT + IntentFilter.MATCH_ADJUSTMENT_NORMAL);
-    assertThat(intentFilter.matchDataAuthority(uriTest1)).isEqualTo(
-        IntentFilter.MATCH_CATEGORY_HOST + IntentFilter.MATCH_CATEGORY_PORT + IntentFilter.MATCH_ADJUSTMENT_NORMAL);
+    assertThat(intentFilter.matchDataAuthority(uriTest1))
+        .isEqualTo(IntentFilter.MATCH_CATEGORY_PORT);
+    assertThat(intentFilter.matchDataAuthority(uriTest2))
+        .isEqualTo(IntentFilter.MATCH_CATEGORY_PORT);
   }
 
   @Test
@@ -104,10 +104,10 @@ public class ShadowIntentFilterTest {
 
     Uri uriTest1 = Uri.parse("http://testHost1:100");
     Uri uriTest2 = Uri.parse("http://testHost2:200");
-    assertThat(intentFilter.matchDataAuthority(uriTest1)).isEqualTo(
-        IntentFilter.MATCH_CATEGORY_HOST + IntentFilter.MATCH_ADJUSTMENT_NORMAL);
-    assertThat(intentFilter.matchDataAuthority(uriTest2)).isEqualTo(
-        IntentFilter.MATCH_CATEGORY_HOST + IntentFilter.MATCH_ADJUSTMENT_NORMAL);
+    assertThat(intentFilter.matchDataAuthority(uriTest1))
+        .isEqualTo(IntentFilter.MATCH_CATEGORY_HOST);
+    assertThat(intentFilter.matchDataAuthority(uriTest2))
+        .isEqualTo(IntentFilter.MATCH_CATEGORY_HOST);
   }
 
   @Test
@@ -120,50 +120,45 @@ public class ShadowIntentFilterTest {
     Uri uriTest1 = Uri.parse("http://testHost1:2");
     // Host doesn't match
     Uri uriTest2 = Uri.parse("http://testHost3:2");
-    assertThat(intentFilter.matchDataAuthority(uriTest1)).isEqualTo(
-        IntentFilter.NO_MATCH_DATA);
-    assertThat(intentFilter.matchDataAuthority(uriTest2)).isEqualTo(
-        IntentFilter.NO_MATCH_DATA);
+    assertThat(intentFilter.matchDataAuthority(uriTest1)).isEqualTo(IntentFilter.NO_MATCH_DATA);
+    assertThat(intentFilter.matchDataAuthority(uriTest2)).isEqualTo(IntentFilter.NO_MATCH_DATA);
   }
 
   @Test
-  public void matchData_MatchAll() throws IntentFilter.MalformedMimeTypeException{
+  public void matchData_MatchAll() throws IntentFilter.MalformedMimeTypeException {
     IntentFilter intentFilter = new IntentFilter();
     intentFilter.addDataType("image/test");
     intentFilter.addDataScheme("http");
     intentFilter.addDataAuthority("testHost1", "1");
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
-    assertThat(intentFilter.matchData("image/test", "http", uriTest1))
-        .isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData("image/test", "http", uriTest1)).isAtLeast(0);
   }
 
   @Test
   public void matchData_MatchType() throws IntentFilter.MalformedMimeTypeException {
     IntentFilter intentFilter = new IntentFilter();
     intentFilter.addDataType("image/test");
+    intentFilter.addDataScheme("http");
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
-    assertThat(intentFilter.matchData("image/test", "http", uriTest1))
-        .isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData("image/test", "http", uriTest1)).isAtLeast(0);
   }
 
   @Test
-  public void matchData_MatchScheme() throws IntentFilter.MalformedMimeTypeException {
+  public void matchData_MatchScheme() {
     IntentFilter intentFilter = new IntentFilter();
     intentFilter.addDataScheme("http");
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
-    assertThat(intentFilter.matchData(null, "http", uriTest1))
-        .isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData(null, "http", uriTest1)).isAtLeast(0);
   }
 
   @Test
-  public void matchData_MatchEmpty() throws IntentFilter.MalformedMimeTypeException {
+  public void matchData_MatchEmpty() {
     IntentFilter intentFilter = new IntentFilter();
 
-    assertThat(intentFilter.matchData(null, "noscheme", null))
-        .isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData(null, "noscheme", null)).isAtLeast(0);
   }
 
   @Test
@@ -172,8 +167,7 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataType("image/testFail");
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
-    assertThat(intentFilter.matchData("image/test", "http", uriTest1))
-        .isLessThan(0);
+    assertThat(intentFilter.matchData("image/test", "http", uriTest1)).isLessThan(0);
   }
 
   @Test
@@ -183,8 +177,7 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataType("image/test");
 
     Uri uriTest1 = Uri.parse("https://testHost1:1");
-    assertThat(intentFilter.matchData("image/test", "https", uriTest1))
-        .isLessThan(0);
+    assertThat(intentFilter.matchData("image/test", "https", uriTest1)).isLessThan(0);
   }
 
   @Test
@@ -195,8 +188,7 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataAuthority("testHost1", "1");
 
     Uri uriTest1 = Uri.parse("http://testHost1:2");
-    assertThat(intentFilter.matchData("image/test", "http", uriTest1))
-        .isLessThan(0);
+    assertThat(intentFilter.matchData("image/test", "http", uriTest1)).isLessThan(0);
   }
 
   @Test
@@ -206,8 +198,7 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataType("image/testFail");
 
     Uri uriTest1 = Uri.parse("http://testHost1:1");
-    assertThat(intentFilter.matchData("image/test", "http", uriTest1))
-        .isLessThan(0);
+    assertThat(intentFilter.matchData("image/test", "http", uriTest1)).isLessThan(0);
   }
 
   @Test
@@ -217,7 +208,7 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataType("image/*");
 
     Uri uri = Uri.parse("content://authority/images");
-    assertThat(intentFilter.matchData("image/test", "content", uri)).isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData("image/test", "content", uri)).isAtLeast(0);
     assertThat(intentFilter.matchData("video/test", "content", uri)).isLessThan(0);
   }
 
@@ -228,9 +219,17 @@ public class ShadowIntentFilterTest {
     intentFilter.addDataType("*/*");
 
     Uri uri = Uri.parse("content://authority/images");
-    assertThat(intentFilter.matchData("image/test", "content", uri)).isGreaterThanOrEqualTo(0);
-    assertThat(intentFilter.matchData("image/*", "content", uri)).isGreaterThanOrEqualTo(0);
-    assertThat(intentFilter.matchData("video/test", "content", uri)).isGreaterThanOrEqualTo(0);
-    assertThat(intentFilter.matchData("video/*", "content", uri)).isGreaterThanOrEqualTo(0);
+    assertThat(intentFilter.matchData("image/test", "content", uri)).isAtLeast(0);
+    assertThat(intentFilter.matchData("image/*", "content", uri)).isAtLeast(0);
+    assertThat(intentFilter.matchData("video/test", "content", uri)).isAtLeast(0);
+    assertThat(intentFilter.matchData("video/*", "content", uri)).isAtLeast(0);
+  }
+
+  @Test
+  public void testCountDataTypes() throws Exception {
+    IntentFilter intentFilter = new IntentFilter();
+    intentFilter.addDataType("image/*");
+    intentFilter.addDataType("audio/*");
+    assertThat(intentFilter.countDataTypes()).isEqualTo(2);
   }
 }

@@ -1,36 +1,36 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.util.Pair;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowPairTest {
 
   @Test
-  public void testConstructor() throws Exception {
+  public void testConstructor() {
     Pair<String, Integer> pair = new Pair<>("a", 1);
     assertThat(pair.first).isEqualTo("a");
     assertThat(pair.second).isEqualTo(1);
   }
 
   @Test
-  public void testStaticCreate() throws Exception {
+  public void testStaticCreate() {
     Pair<String, String> p = Pair.create("Foo", "Bar");
     assertThat(p.first).isEqualTo("Foo");
     assertThat(p.second).isEqualTo("Bar");
   }
 
   @Test
-  public void testEquals() throws Exception {
+  public void testEquals() {
     assertThat(Pair.create("1", 2)).isEqualTo(Pair.create("1", 2));
   }
 
   @Test
-  public void testHash() throws Exception {
+  public void testHash() {
     assertThat(Pair.create("1", 2).hashCode()).isEqualTo(Pair.create("1", 2).hashCode());
   }
 }

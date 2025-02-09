@@ -1,20 +1,19 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.database.AbstractCursor;
 import android.net.Uri;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowAbstractCursorTest {
 
   private TestCursor cursor;
@@ -22,6 +21,11 @@ public class ShadowAbstractCursorTest {
   @Before
   public void setUp() throws Exception {
     cursor = new TestCursor();
+  }
+
+  @After
+  public void tearDown() {
+    cursor.close();
   }
 
   @Test
@@ -207,10 +211,10 @@ public class ShadowAbstractCursorTest {
   @Test
   public void testGetNotificationUri() {
     Uri uri = Uri.parse("content://foo.com");
-    ShadowAbstractCursor shadow = Shadows.shadowOf(cursor);
-    assertThat(shadow.getNotificationUri_Compatibility()).isNull();
-    cursor.setNotificationUri(RuntimeEnvironment.application.getContentResolver(), uri);
-    assertThat(shadow.getNotificationUri_Compatibility()).isEqualTo(uri);
+    assertThat(cursor.getNotificationUri()).isNull();
+    cursor.setNotificationUri(
+        ApplicationProvider.getApplicationContext().getContentResolver(), uri);
+    assertThat(cursor.getNotificationUri()).isEqualTo(uri);
   }
 
   @Test
@@ -220,7 +224,7 @@ public class ShadowAbstractCursorTest {
     assertThat(cursor.isClosed()).isTrue();
   }
 
-  private class TestCursor extends AbstractCursor {
+  private static class TestCursor extends AbstractCursor {
 
     public List<Object> theTable = new ArrayList<>();
 

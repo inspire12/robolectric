@@ -1,22 +1,23 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.fail;
+
 import android.graphics.Canvas;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Fail.fail;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowCameraTest {
 
   private Camera camera;
@@ -29,25 +30,25 @@ public class ShadowCameraTest {
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     ShadowCamera.clearCameraInfo();
   }
 
   @Test
-  public void testOpen() throws Exception {
+  public void testOpen() {
     assertThat(camera).isNotNull();
     assertThat(ShadowCamera.getLastOpenedCameraId()).isEqualTo(0);
   }
 
   @Test
-  public void testOpenWithId() throws Exception {
+  public void testOpenWithId() {
     camera = Camera.open(12);
     assertThat(camera).isNotNull();
     assertThat(ShadowCamera.getLastOpenedCameraId()).isEqualTo(12);
   }
 
   @Test
-  public void testUnlock() throws Exception {
+  public void testUnlock() {
     assertThat(shadowCamera.isLocked()).isTrue();
     camera.unlock();
     assertThat(shadowCamera.isLocked()).isFalse();
@@ -62,15 +63,15 @@ public class ShadowCameraTest {
   }
 
   @Test
-  public void testGetParameters() throws Exception {
+  public void testGetParameters() {
     Camera.Parameters parameters = camera.getParameters();
     assertThat(parameters).isNotNull();
     assertThat(parameters.getSupportedPreviewFormats()).isNotNull();
-    assertThat(parameters.getSupportedPreviewFormats().size()).isNotEqualTo(0);
+    assertThat(parameters.getSupportedPreviewFormats()).isNotEmpty();
   }
 
   @Test
-  public void testSetParameters() throws Exception {
+  public void testSetParameters() {
     Camera.Parameters parameters = camera.getParameters();
     assertThat(parameters.getPreviewFormat()).isEqualTo(ImageFormat.NV21);
     parameters.setPreviewFormat(ImageFormat.JPEG);
@@ -82,18 +83,18 @@ public class ShadowCameraTest {
   public void testSetPreviewDisplay() throws Exception {
     SurfaceHolder previewSurfaceHolder = new TestSurfaceHolder();
     camera.setPreviewDisplay(previewSurfaceHolder);
-    assertThat(shadowCamera.getPreviewDisplay()).isSameAs(previewSurfaceHolder);
+    assertThat(shadowCamera.getPreviewDisplay()).isSameInstanceAs(previewSurfaceHolder);
   }
 
   @Test
-  public void testStartPreview() throws Exception {
+  public void testStartPreview() {
     assertThat(shadowCamera.isPreviewing()).isFalse();
     camera.startPreview();
     assertThat(shadowCamera.isPreviewing()).isTrue();
   }
 
   @Test
-  public void testStopPreview() throws Exception {
+  public void testStopPreview() {
     camera.startPreview();
     assertThat(shadowCamera.isPreviewing()).isTrue();
     camera.stopPreview();
@@ -101,53 +102,53 @@ public class ShadowCameraTest {
   }
 
   @Test
-  public void testRelease() throws Exception {
+  public void testRelease() {
     assertThat(shadowCamera.isReleased()).isFalse();
     camera.release();
     assertThat(shadowCamera.isReleased()).isTrue();
   }
 
   @Test
-  public void testSetPreviewCallbacks() throws Exception {
+  public void testSetPreviewCallbacks() {
     TestPreviewCallback callback = new TestPreviewCallback();
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
 
     camera.setPreviewCallback(callback);
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
 
-    assertThat(callback.camera).isSameAs(camera);
-    assertThat(callback.data).isEqualTo("foobar".getBytes());
+    assertThat(callback.camera).isSameInstanceAs(camera);
+    assertThat(callback.data).isEqualTo("foobar".getBytes(UTF_8));
   }
 
   @Test
-  public void testSetOneShotPreviewCallbacks() throws Exception {
+  public void testSetOneShotPreviewCallbacks() {
     TestPreviewCallback callback = new TestPreviewCallback();
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
 
     camera.setOneShotPreviewCallback(callback);
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
 
-    assertThat(callback.camera).isSameAs(camera);
-    assertThat(callback.data).isEqualTo("foobar".getBytes());
+    assertThat(callback.camera).isSameInstanceAs(camera);
+    assertThat(callback.data).isEqualTo("foobar".getBytes(UTF_8));
   }
 
   @Test
-  public void testPreviewCallbacksWithBuffers() throws Exception {
+  public void testPreviewCallbacksWithBuffers() {
     TestPreviewCallback callback = new TestPreviewCallback();
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
 
     camera.setPreviewCallbackWithBuffer(callback);
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
 
-    assertThat(callback.camera).isSameAs(camera);
-    assertThat(callback.data).isEqualTo("foobar".getBytes());
+    assertThat(callback.camera).isSameInstanceAs(camera);
+    assertThat(callback.data).isEqualTo("foobar".getBytes(UTF_8));
   }
 
   @Test
-  public void testClearPreviewCallback() throws Exception {
+  public void testClearPreviewCallback() {
     TestPreviewCallback callback = new TestPreviewCallback();
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
@@ -155,21 +156,21 @@ public class ShadowCameraTest {
     camera.setPreviewCallback(callback);
     camera.setPreviewCallback(null);
 
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
 
     camera.setOneShotPreviewCallback(callback);
     camera.setOneShotPreviewCallback(null);
 
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
 
     camera.setPreviewCallbackWithBuffer(callback);
     camera.setPreviewCallbackWithBuffer(null);
 
-    shadowCamera.invokePreviewCallback("foobar".getBytes());
+    shadowCamera.invokePreviewCallback("foobar".getBytes(UTF_8));
     assertThat(callback.camera).isNull();
     assertThat(callback.data).isNull();
   }
@@ -212,7 +213,7 @@ public class ShadowCameraTest {
 
     assertThat(shadowCamera.hasRequestedAutoFocus()).isTrue();
     shadowCamera.invokeAutoFocusCallback(true, camera);
-    assertThat(callback.success).isEqualTo(true);
+    assertThat(callback.success).isTrue();
     assertThat(callback.camera).isEqualTo(camera);
 
     assertThat(shadowCamera.hasRequestedAutoFocus()).isFalse();
@@ -244,12 +245,12 @@ public class ShadowCameraTest {
   }
 
   @Test
-  public void testCameraInfoNoCameras() throws Exception {
+  public void testCameraInfoNoCameras() {
     assertThat(Camera.getNumberOfCameras()).isEqualTo(0);
   }
 
   @Test
-  public void testCameraInfoBackOnly() throws Exception {
+  public void testCameraInfoBackOnly() {
     Camera.CameraInfo cameraQuery = new Camera.CameraInfo();
 
     addBackCamera();
@@ -261,7 +262,7 @@ public class ShadowCameraTest {
   }
 
   @Test
-  public void testCameraInfoBackAndFront() throws Exception {
+  public void testCameraInfoBackAndFront() {
     Camera.CameraInfo cameraQuery = new Camera.CameraInfo();
     addBackCamera();
     addFrontCamera();
@@ -273,6 +274,77 @@ public class ShadowCameraTest {
     Camera.getCameraInfo(1, cameraQuery);
     assertThat(cameraQuery.facing).isEqualTo(Camera.CameraInfo.CAMERA_FACING_FRONT);
     assertThat(cameraQuery.orientation).isEqualTo(90);
+  }
+
+  @Test
+  public void testCameraInfoShutterSound() {
+    Camera.CameraInfo cameraQueryCannotDisable = new Camera.CameraInfo();
+    Camera.CameraInfo cameraInfoCannotDisable = new Camera.CameraInfo();
+    cameraInfoCannotDisable.canDisableShutterSound = false;
+    ShadowCamera.addCameraInfo(0, cameraInfoCannotDisable);
+
+    Camera.CameraInfo cameraQueryCanDisable = new Camera.CameraInfo();
+    Camera.CameraInfo cameraInfoCanDisable = new Camera.CameraInfo();
+    cameraInfoCanDisable.canDisableShutterSound = true;
+    ShadowCamera.addCameraInfo(1, cameraInfoCanDisable);
+
+    assertThat(Camera.getNumberOfCameras()).isEqualTo(2);
+    Camera.getCameraInfo(0, cameraQueryCannotDisable);
+    assertThat(cameraQueryCannotDisable.canDisableShutterSound).isFalse();
+    Camera.getCameraInfo(1, cameraQueryCanDisable);
+    assertThat(cameraQueryCanDisable.canDisableShutterSound).isTrue();
+  }
+
+  @Test
+  public void testTakePicture() {
+    camera.takePicture(null, null, null);
+
+    TestShutterCallback shutterCallback = new TestShutterCallback();
+    TestPictureCallback rawCallback = new TestPictureCallback();
+    TestPictureCallback jpegCallback = new TestPictureCallback();
+    camera.takePicture(shutterCallback, rawCallback, jpegCallback);
+
+    assertThat(shutterCallback.wasCalled).isTrue();
+    assertThat(rawCallback.wasCalled).isTrue();
+    assertThat(jpegCallback.wasCalled).isTrue();
+  }
+
+  @Test
+  public void testShutterEnabled() {
+    Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
+    cameraInfo.facing = Camera.CameraInfo.CAMERA_FACING_BACK;
+    cameraInfo.canDisableShutterSound = false;
+    ShadowCamera.addCameraInfo(0, cameraInfo);
+
+    assertThat(Camera.getNumberOfCameras()).isEqualTo(1);
+    assertThat(shadowCamera.enableShutterSound(true)).isTrue();
+    assertThat(shadowCamera.enableShutterSound(false)).isFalse();
+
+    cameraInfo.canDisableShutterSound = true;
+    assertThat(shadowCamera.enableShutterSound(true)).isTrue();
+    assertThat(shadowCamera.enableShutterSound(false)).isTrue();
+    assertThat(shadowCamera.enableShutterSound(true)).isTrue();
+  }
+
+  @Test
+  public void cameraParameters_areCached() {
+    assertThat(camera.getParameters()).isSameInstanceAs(Camera.open().getParameters());
+  }
+
+  @Test
+  public void setSupportedFocusModes_empty_clearsCurrentFocusMode() {
+    Camera.Parameters parameters = camera.getParameters();
+    assertThat(parameters.getFocusMode()).isNotNull();
+    Shadows.shadowOf(parameters).setSupportedFocusModes();
+    assertThat(parameters.getFocusMode()).isNull();
+  }
+
+  @Test
+  public void setSupportedFlashModes_empty_clearsCurrentFocusMode() {
+    Camera.Parameters parameters = camera.getParameters();
+    assertThat(parameters.getFlashMode()).isNotNull();
+    Shadows.shadowOf(parameters).setSupportedFlashModes();
+    assertThat(parameters.getFlashMode()).isNull();
   }
 
   private void addBackCamera() {
@@ -304,17 +376,35 @@ public class ShadowCameraTest {
     public boolean success;
     public Camera camera;
 
+    @Override
     public void onAutoFocus(boolean success, Camera camera) {
       this.success = success;
       this.camera = camera;
     }
   }
 
+  private static class TestShutterCallback implements Camera.ShutterCallback {
+    public boolean wasCalled;
+
+    @Override
+    public void onShutter() {
+      wasCalled = true;
+    }
+  }
+
+  private static class TestPictureCallback implements Camera.PictureCallback {
+    public boolean wasCalled;
+
+    @Override
+    public void onPictureTaken(byte[] data, Camera camera) {
+      wasCalled = true;
+    }
+  }
+
   private static class TestSurfaceHolder implements SurfaceHolder {
 
     @Override
-    public void addCallback(Callback callback) {
-    }
+    public void addCallback(Callback callback) {}
 
     @Override
     public Surface getSurface() {
@@ -342,31 +432,24 @@ public class ShadowCameraTest {
     }
 
     @Override
-    public void removeCallback(Callback callback) {
-    }
+    public void removeCallback(Callback callback) {}
 
     @Override
-    public void setFixedSize(int width, int height) {
-    }
+    public void setFixedSize(int width, int height) {}
 
     @Override
-    public void setFormat(int format) {
-    }
+    public void setFormat(int format) {}
 
     @Override
-    public void setKeepScreenOn(boolean screenOn) {
-    }
+    public void setKeepScreenOn(boolean screenOn) {}
 
     @Override
-    public void setSizeFromLayout() {
-    }
+    public void setSizeFromLayout() {}
 
     @Override
-    public void setType(int type) {
-    }
+    public void setType(int type) {}
 
     @Override
-    public void unlockCanvasAndPost(Canvas canvas) {
-    }
+    public void unlockCanvasAndPost(Canvas canvas) {}
   }
 }

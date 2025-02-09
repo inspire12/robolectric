@@ -1,38 +1,28 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.app.Notification;
 import android.os.Parcel;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.TextView;
-
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.WithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowAccessibilityEventTest {
 
   private AccessibilityEvent event;
-  private ShadowAccessibilityEvent shadow;
 
   @Before
   public void setUp() {
-    ShadowAccessibilityEvent.resetObtainedInstances();
-    assertThat(ShadowAccessibilityEvent.areThereUnrecycledEvents(true)).isEqualTo(false);
-    event = ShadowAccessibilityEvent.obtain();
-    shadow = shadowOf(event);
-    assertThat(shadow != null).isEqualTo(true);
-  }
-
-  @Test
-  public void shouldHaveObtainedEvent() {
-    assertThat(ShadowAccessibilityEvent.areThereUnrecycledEvents(false)).isEqualTo(true);
+    event = AccessibilityEvent.obtain();
   }
 
   @Test
@@ -40,16 +30,24 @@ public class ShadowAccessibilityEventTest {
     final Notification notification = new Notification();
     event.setParcelableData(notification);
     AccessibilityEvent anotherEvent = AccessibilityEvent.obtain(event);
-    assertThat(anotherEvent.getParcelableData() instanceof Notification).isEqualTo(true);
+    assertThat(anotherEvent.getParcelableData()).isInstanceOf(Notification.class);
     assertThat(anotherEvent.getParcelableData()).isEqualTo(notification);
     anotherEvent.recycle();
   }
 
   @Test
-  public void shouldEqualToClonedEvent() {
-    shadow.setEventType(AccessibilityEvent.TYPE_ANNOUNCEMENT);
-    AccessibilityEvent newEvent = ShadowAccessibilityEvent.obtain(event);
-    assertThat(shadow.equals(newEvent)).isEqualTo(true);
+  public void shouldBeEqualToClonedEvent() {
+    event.setEventType(AccessibilityEvent.TYPE_ANNOUNCEMENT);
+    AccessibilityEvent newEvent = AccessibilityEvent.obtain(event);
+    assertThat(event.getEventType()).isEqualTo(newEvent.getEventType());
+    assertThat(event.isEnabled()).isEqualTo(newEvent.isEnabled());
+    assertThat(nullOrString(event.getContentDescription()))
+        .isEqualTo(nullOrString(newEvent.getContentDescription()));
+    assertThat(nullOrString(event.getPackageName()))
+        .isEqualTo(nullOrString(newEvent.getPackageName()));
+    assertThat(nullOrString(event.getClassName())).isEqualTo(nullOrString(newEvent.getClassName()));
+    assertThat(event.getParcelableData()).isEqualTo(newEvent.getParcelableData());
+
     newEvent.recycle();
   }
 
@@ -60,25 +58,52 @@ public class ShadowAccessibilityEventTest {
     event.writeToParcel(p, 0);
     p.setDataPosition(0);
     AccessibilityEvent anotherEvent = AccessibilityEvent.CREATOR.createFromParcel(p);
-    assertThat(event).isEqualTo(anotherEvent);
-    event.setContentDescription(null);
+    assertThat(anotherEvent.getEventType()).isEqualTo(event.getEventType());
+    assertThat(anotherEvent.isEnabled()).isEqualTo(event.isEnabled());
+    assertThat(nullOrString(anotherEvent.getContentDescription()))
+        .isEqualTo(nullOrString(event.getContentDescription()));
+    assertThat(nullOrString(anotherEvent.getPackageName()))
+        .isEqualTo(nullOrString(event.getPackageName()));
+    assertThat(nullOrString(anotherEvent.getClassName()))
+        .isEqualTo(nullOrString(event.getClassName()));
+    assertThat(anotherEvent.getParcelableData()).isEqualTo(event.getParcelableData());
+    anotherEvent.setContentDescription(null);
     anotherEvent.recycle();
   }
 
   @Test
   public void shouldHaveCurrentSourceId() {
-    TextView rootView = new TextView(RuntimeEnvironment.application);
+    TextView rootView = new TextView(ApplicationProvider.getApplicationContext());
     event.setSource(rootView);
-    assertThat(shadow.getSourceRoot()).isEqualTo(rootView);
-    assertThat(shadow.getVirtualDescendantId()).isEqualTo(ShadowAccessibilityRecord.NO_VIRTUAL_ID);
+    assertThat(shadowOf(event).getSourceRoot()).isEqualTo(rootView);
+    assertThat(shadowOf(event).getVirtualDescendantId())
+        .isEqualTo(ShadowAccessibilityRecord.NO_VIRTUAL_ID);
     event.setSource(rootView, 1);
-    assertThat(shadow.getVirtualDescendantId()).isEqualTo(1);
+    assertThat(shadowOf(event).getVirtualDescendantId()).isEqualTo(1);
+  }
+
+  @Test
+  public void setSourceNode() {
+    AccessibilityNodeInfo node = AccessibilityNodeInfo.obtain();
+    shadowOf(event).setSourceNode(node);
+    assertThat(event.getSource()).isEqualTo(node);
+    node.recycle();
+  }
+
+  @Test
+  public void setWindowId() {
+    int id = 2;
+    shadowOf(event).setWindowId(id);
+    assertThat(event.getWindowId()).isEqualTo(id);
   }
 
   @After
   public void tearDown() {
-    shadow.recycle();
-    assertThat(ShadowAccessibilityEvent.areThereUnrecycledEvents(true)).isEqualTo(false);
+    event.recycle();
+  }
+
+  /** Some CharSequence objects are null, so we need a null check wrapper */
+  private String nullOrString(CharSequence charSequence) {
+    return charSequence == null ? null : charSequence.toString();
   }
 }
-

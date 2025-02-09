@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.robolectric">
-  <uses-sdk android:targetSdkVersion="18"/>
+  <uses-sdk android:targetSdkVersion="19"/>
 
   <application>
-    <receiver android:name="org.robolectric.manifest.AndroidManifestTest.ConfigTestReceiver"
+    <receiver android:name="org.robolectric.ConfigTestReceiver.InnerReceiver"
           android:permission="com.ignored.PERM">
       <intent-filter>
         <action android:name="org.robolectric.ACTION1"/>
@@ -21,7 +21,7 @@
       </intent-filter>
     </receiver>
 
-    <receiver android:name="org.robolectric.ConfigTestReceiver">
+    <receiver android:name="org.robolectric.ConfigTestReceiver" android:exported="true">
       <intent-filter>
         <action android:name="org.robolectric.ACTION_SUBSET_PACKAGE"/>
       </intent-filter>
@@ -33,7 +33,7 @@
       </intent-filter>
     </receiver>
 
-    <receiver android:name=".test.ConfigTestReceiver">
+    <receiver android:name=".test.ConfigTestReceiver" android:enabled="false">
       <intent-filter>
         <action android:name="org.robolectric.ACTION_DOT_SUBPACKAGE"/>
       </intent-filter>

@@ -1,17 +1,16 @@
 package org.robolectric;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.database.CursorWrapper;
+import java.util.Arrays;
+import java.util.Collection;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.ShadowCursorWrapper;
-
-import java.util.Arrays;
-import java.util.Collection;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Parameterized tests using custom shadow classes.
@@ -40,13 +39,8 @@ public final class ParameterizedRobolectricTestRunnerConfigTest {
   }
 
   @ParameterizedRobolectricTestRunner.Parameters(name = "ConfigTest: {0}")
-  public static Collection getTestData() {
-    Object[][] data = {
-        { 1 },
-        { 2 },
-        { 3 },
-        { 4 }
-    };
+  public static Collection<?> getTestData() {
+    Object[][] data = {{1}, {2}, {3}, {4}};
     return Arrays.asList(data);
   }
 

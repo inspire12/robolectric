@@ -1,25 +1,25 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.Robolectric.buildActivity;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.app.Activity;
 import android.content.Context;
 import android.preference.Preference;
 import android.preference.PreferenceGroup;
 import android.preference.PreferenceManager;
 import android.util.AttributeSet;
-
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.fakes.RoboAttributeSet;
+import org.robolectric.annotation.ResourcesMode;
+import org.robolectric.annotation.ResourcesMode.Mode;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.Robolectric.buildActivity;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
+@ResourcesMode(Mode.BINARY)
 public class ShadowPreferenceGroupTest {
 
   private TestPreferenceGroup group;
@@ -31,7 +31,7 @@ public class ShadowPreferenceGroupTest {
   @Before
   public void setUp() throws Exception {
     activity = buildActivity(Activity.class).create().get();
-    attrs =  Robolectric.buildAttributeSet().build();
+    attrs = Robolectric.buildAttributeSet().build();
 
     group = new TestPreferenceGroup(activity, attrs);
     shadow = shadowOf(group);
@@ -88,8 +88,8 @@ public class ShadowPreferenceGroupTest {
     group.addPreference(pref1);
     group.addPreference(pref2);
 
-    assertThat(group.getPreference(0)).isSameAs(pref1);
-    assertThat(group.getPreference(1)).isSameAs(pref2);
+    assertThat(group.getPreference(0)).isSameInstanceAs(pref1);
+    assertThat(group.getPreference(1)).isSameInstanceAs(pref2);
   }
 
   @Test
@@ -135,8 +135,8 @@ public class ShadowPreferenceGroupTest {
     group.addPreference(pref1);
     group.addPreference(pref2);
 
-    assertThat(group.findPreference(pref1.getKey())).isSameAs(pref1);
-    assertThat(group.findPreference(pref2.getKey())).isSameAs(pref2);
+    assertThat(group.findPreference(pref1.getKey())).isSameInstanceAs(pref1);
+    assertThat(group.findPreference(pref2.getKey())).isSameInstanceAs(pref2);
   }
 
   @Test
@@ -148,7 +148,7 @@ public class ShadowPreferenceGroupTest {
     group.addPreference(pref1);
     group.addPreference(group2);
 
-    assertThat(group.findPreference(pref2.getKey())).isSameAs(pref2);
+    assertThat(group.findPreference(pref2.getKey())).isSameInstanceAs(pref2);
   }
 
   @Test

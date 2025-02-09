@@ -1,15 +1,15 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.content.ContentUris;
 import android.net.Uri;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowContentUrisTest {
   Uri URI;
 
@@ -18,7 +18,8 @@ public class ShadowContentUrisTest {
     URI = Uri.parse("content://foo.com");
   }
 
-  @Test public void canAppendId() {
+  @Test
+  public void canAppendId() {
     assertThat(ContentUris.withAppendedId(URI, 1)).isEqualTo(Uri.parse("content://foo.com/1"));
   }
 
@@ -27,7 +28,8 @@ public class ShadowContentUrisTest {
     ContentUris.withAppendedId(null, 1);
   }
 
-  @Test public void canParseId() {
+  @Test
+  public void canParseId() {
     assertThat(ContentUris.parseId(Uri.withAppendedPath(URI, "1"))).isEqualTo(1L);
     assertThat(ContentUris.parseId(URI)).isEqualTo(-1L);
   }
@@ -41,5 +43,4 @@ public class ShadowContentUrisTest {
   public void parseIdThrowsUnsupportedException() {
     ContentUris.parseId(Uri.parse("mailto:bar@foo.com"));
   }
-
 }

@@ -1,5 +1,19 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.robolectric.Robolectric.buildActivity;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.app.Activity;
 import android.graphics.Typeface;
 import android.text.Editable;
@@ -21,35 +35,24 @@ import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
 import android.widget.FrameLayout;
 import android.widget.TextView;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.robolectric.R;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.internal.Shadow;
-import org.robolectric.util.ActivityController;
+import org.robolectric.android.controller.ActivityController;
+import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.annotation.GraphicsMode.Mode;
+import org.robolectric.shadow.api.Shadow;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import static java.util.Arrays.asList;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.robolectric.Robolectric.buildActivity;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
+@GraphicsMode(Mode.LEGACY)
 public class ShadowTextViewTest {
 
   private static final String INITIAL_TEXT = "initial text";
@@ -73,7 +76,7 @@ public class ShadowTextViewTest {
 
     textView.onEditorAction(EditorInfo.IME_ACTION_GO);
 
-    assertThat(actionListener.textView).isSameAs(textView);
+    assertThat(actionListener.textView).isSameInstanceAs(textView);
     assertThat(actionListener.sentImeId).isEqualTo(EditorInfo.IME_ACTION_GO);
   }
 
@@ -83,22 +86,21 @@ public class ShadowTextViewTest {
 
     textView.setOnEditorActionListener(actionListener);
 
-    assertThat(shadowOf(textView).getOnEditorActionListener()).isSameAs(actionListener);
+    assertThat(shadowOf(textView).getOnEditorActionListener()).isSameInstanceAs(actionListener);
   }
 
   @Test
-  public void testGetUrls() throws Exception {
+  public void testGetUrls() {
+    Locale.setDefault(Locale.ENGLISH);
     textView.setAutoLinkMask(Linkify.ALL);
     textView.setText("here's some text http://google.com/\nblah\thttp://another.com/123?456 blah");
 
-    assertThat(urlStringsFrom(textView.getUrls())).isEqualTo(asList(
-            "http://google.com",
-            "http://another.com/123?456"
-    ));
+    assertThat(urlStringsFrom(textView.getUrls()))
+        .isEqualTo(asList("http://google.com", "http://another.com/123?456"));
   }
 
   @Test
-  public void testGetGravity() throws Exception {
+  public void testGetGravity() {
     assertThat(textView.getGravity()).isNotEqualTo(Gravity.CENTER);
     textView.setGravity(Gravity.CENTER);
     assertThat(textView.getGravity()).isEqualTo(Gravity.CENTER);
@@ -110,7 +112,7 @@ public class ShadowTextViewTest {
 
     assertNull(textView.getMovementMethod());
     textView.setMovementMethod(movement);
-    assertThat(textView.getMovementMethod()).isSameAs(movement);
+    assertThat(textView.getMovementMethod()).isSameInstanceAs(movement);
   }
 
   @Test
@@ -125,46 +127,52 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void testGetTextAppearanceId() throws Exception {
-    textView.setTextAppearance(RuntimeEnvironment.application, android.R.style.TextAppearance_Small);
+  public void testGetTextAppearanceId() {
+    textView.setTextAppearance(
+        ApplicationProvider.getApplicationContext(), android.R.style.TextAppearance_Small);
 
-    assertThat(shadowOf(textView).getTextAppearanceId()).isEqualTo(android.R.style.TextAppearance_Small);
+    assertThat(shadowOf(textView).getTextAppearanceId())
+        .isEqualTo(android.R.style.TextAppearance_Small);
   }
 
   @Test
-  public void shouldSetTextAndTextColorWhileInflatingXmlLayout() throws Exception {
+  public void shouldSetTextAndTextColorWhileInflatingXmlLayout() {
     Activity activity = activityController.get();
     activity.setContentView(R.layout.text_views);
 
-    TextView black = (TextView) activity.findViewById(R.id.black_text_view);
+    TextView black = activity.findViewById(R.id.black_text_view);
     assertThat(black.getText().toString()).isEqualTo("Black Text");
     assertThat(black.getCurrentTextColor()).isEqualTo(0xff000000);
 
-    TextView white = (TextView) activity.findViewById(R.id.white_text_view);
+    TextView white = activity.findViewById(R.id.white_text_view);
     assertThat(white.getText().toString()).isEqualTo("White Text");
-    assertThat(white.getCurrentTextColor()).isEqualTo(activity.getResources().getColor(android.R.color.white));
+    assertThat(white.getCurrentTextColor())
+        .isEqualTo(activity.getResources().getColor(android.R.color.white));
 
-    TextView grey = (TextView) activity.findViewById(R.id.grey_text_view);
+    TextView grey = activity.findViewById(R.id.grey_text_view);
     assertThat(grey.getText().toString()).isEqualTo("Grey Text");
-    assertThat(grey.getCurrentTextColor()).isEqualTo(activity.getResources().getColor(R.color.grey42));
+    assertThat(grey.getCurrentTextColor())
+        .isEqualTo(activity.getResources().getColor(R.color.grey42));
   }
 
   @Test
-  public void shouldSetHintAndHintColorWhileInflatingXmlLayout() throws Exception {
+  public void shouldSetHintAndHintColorWhileInflatingXmlLayout() {
     Activity activity = activityController.get();
     activity.setContentView(R.layout.text_views_hints);
 
-    TextView black = (TextView) activity.findViewById(R.id.black_text_view_hint);
+    TextView black = activity.findViewById(R.id.black_text_view_hint);
     assertThat(black.getHint().toString()).isEqualTo("Black Hint");
     assertThat(black.getCurrentHintTextColor()).isEqualTo(0xff000000);
 
-    TextView white = (TextView) activity.findViewById(R.id.white_text_view_hint);
+    TextView white = activity.findViewById(R.id.white_text_view_hint);
     assertThat(white.getHint().toString()).isEqualTo("White Hint");
-    assertThat(white.getCurrentHintTextColor()).isEqualTo(activity.getResources().getColor(android.R.color.white));
+    assertThat(white.getCurrentHintTextColor())
+        .isEqualTo(activity.getResources().getColor(android.R.color.white));
 
-    TextView grey = (TextView) activity.findViewById(R.id.grey_text_view_hint);
+    TextView grey = activity.findViewById(R.id.grey_text_view_hint);
     assertThat(grey.getHint().toString()).isEqualTo("Grey Hint");
-    assertThat(grey.getCurrentHintTextColor()).isEqualTo(activity.getResources().getColor(R.color.grey42));
+    assertThat(grey.getCurrentHintTextColor())
+        .isEqualTo(activity.getResources().getColor(R.color.grey42));
   }
 
   @Test
@@ -179,14 +187,17 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void testGetInputType() throws Exception {
-    assertThat(textView.getInputType()).isNotEqualTo(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+  public void testGetInputType() {
+    assertThat(textView.getInputType())
+        .isNotEqualTo(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
     textView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-    assertThat(textView.getInputType()).isEqualTo(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+    assertThat(textView.getInputType())
+        .isEqualTo(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
   }
 
   @Test
-  public void givenATextViewWithATextWatcherAdded_WhenSettingTextWithTextResourceId_ShouldNotifyTextWatcher() {
+  public void
+      givenATextViewWithATextWatcherAdded_WhenSettingTextWithTextResourceId_ShouldNotifyTextWatcher() {
     MockTextWatcher mockTextWatcher = new MockTextWatcher();
     textView.addTextChangedListener(mockTextWatcher);
 
@@ -196,7 +207,8 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void givenATextViewWithATextWatcherAdded_WhenSettingTextWithCharSequence_ShouldNotifyTextWatcher() {
+  public void
+      givenATextViewWithATextWatcherAdded_WhenSettingTextWithCharSequence_ShouldNotifyTextWatcher() {
     MockTextWatcher mockTextWatcher = new MockTextWatcher();
     textView.addTextChangedListener(mockTextWatcher);
 
@@ -216,7 +228,8 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void givenATextViewWithMultipleTextWatchersAdded_WhenSettingText_ShouldNotifyEachTextWatcher() {
+  public void
+      givenATextViewWithMultipleTextWatchersAdded_WhenSettingText_ShouldNotifyEachTextWatcher() {
     List<MockTextWatcher> mockTextWatchers = anyNumberOfTextWatchers();
     for (MockTextWatcher textWatcher : mockTextWatchers) {
       textView.addTextChangedListener(textWatcher);
@@ -237,7 +250,8 @@ public class ShadowTextViewTest {
 
     textView.setText(NEW_TEXT);
 
-    verify(mockTextWatcher).beforeTextChanged(INITIAL_TEXT, 0, INITIAL_TEXT.length(), NEW_TEXT.length());
+    verify(mockTextWatcher)
+        .beforeTextChanged(INITIAL_TEXT, 0, INITIAL_TEXT.length(), NEW_TEXT.length());
   }
 
   @Test
@@ -248,8 +262,11 @@ public class ShadowTextViewTest {
 
     textView.setText(NEW_TEXT);
 
-    ArgumentCaptor<SpannableStringBuilder> builderCaptor = ArgumentCaptor.forClass(SpannableStringBuilder.class);
-    verify(mockTextWatcher).onTextChanged(builderCaptor.capture(), eq(0), eq(INITIAL_TEXT.length()), eq(NEW_TEXT.length()));
+    ArgumentCaptor<SpannableStringBuilder> builderCaptor =
+        ArgumentCaptor.forClass(SpannableStringBuilder.class);
+    verify(mockTextWatcher)
+        .onTextChanged(
+            builderCaptor.capture(), eq(0), eq(INITIAL_TEXT.length()), eq(NEW_TEXT.length()));
     assertThat(builderCaptor.getValue().toString()).isEqualTo(NEW_TEXT);
   }
 
@@ -279,7 +296,9 @@ public class ShadowTextViewTest {
 
     textView.append(NEW_TEXT);
 
-    verify(mockTextWatcher).beforeTextChanged(eq(INITIAL_TEXT), eq(0), eq(INITIAL_TEXT.length()), eq(INITIAL_TEXT.length()));
+    verify(mockTextWatcher)
+        .beforeTextChanged(
+            eq(INITIAL_TEXT), eq(0), eq(INITIAL_TEXT.length()), eq(INITIAL_TEXT.length()));
   }
 
   @Test
@@ -290,8 +309,11 @@ public class ShadowTextViewTest {
 
     textView.append(NEW_TEXT);
 
-    ArgumentCaptor<SpannableStringBuilder> builderCaptor = ArgumentCaptor.forClass(SpannableStringBuilder.class);
-    verify(mockTextWatcher).onTextChanged(builderCaptor.capture(), eq(0), eq(INITIAL_TEXT.length()), eq(INITIAL_TEXT.length()));
+    ArgumentCaptor<SpannableStringBuilder> builderCaptor =
+        ArgumentCaptor.forClass(SpannableStringBuilder.class);
+    verify(mockTextWatcher)
+        .onTextChanged(
+            builderCaptor.capture(), eq(0), eq(INITIAL_TEXT.length()), eq(INITIAL_TEXT.length()));
     assertThat(builderCaptor.getValue().toString()).isEqualTo(INITIAL_TEXT + NEW_TEXT);
   }
 
@@ -303,11 +325,12 @@ public class ShadowTextViewTest {
 
     textView.append(NEW_TEXT);
 
-    assertThat(mockTextWatcher.afterTextChangeArgument.toString()).isEqualTo(INITIAL_TEXT + NEW_TEXT);
+    assertThat(mockTextWatcher.afterTextChangeArgument.toString())
+        .isEqualTo(INITIAL_TEXT + NEW_TEXT);
   }
 
   @Test
-  public void removeTextChangedListener_shouldRemoveTheListener() throws Exception {
+  public void removeTextChangedListener_shouldRemoveTheListener() {
     MockTextWatcher watcher = new MockTextWatcher();
     textView.addTextChangedListener(watcher);
     assertTrue(shadowOf(textView).getWatchers().contains(watcher));
@@ -317,12 +340,12 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void getPaint_returnsMeasureTextEnabledObject() throws Exception {
+  public void getPaint_returnsMeasureTextEnabledObject() {
     assertThat(textView.getPaint().measureText("12345")).isEqualTo(5f);
   }
 
   @Test
-  public void append_whenSelectionIsAtTheEnd_shouldKeepSelectionAtTheEnd() throws Exception {
+  public void append_whenSelectionIsAtTheEnd_shouldKeepSelectionAtTheEnd() {
     textView.setText("1", TextView.BufferType.EDITABLE);
     Selection.setSelection(textView.getEditableText(), 0, 0);
     textView.append("2");
@@ -336,7 +359,7 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void append_whenSelectionReachesToEnd_shouldExtendSelectionToTheEnd() throws Exception {
+  public void append_whenSelectionReachesToEnd_shouldExtendSelectionToTheEnd() {
     textView.setText("12", TextView.BufferType.EDITABLE);
     Selection.setSelection(textView.getEditableText(), 0, 2);
     textView.append("3");
@@ -345,17 +368,28 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void testSetCompountDrawablesWithIntrinsicBounds_int_shouldCreateDrawablesWithResourceIds() throws Exception {
-    textView.setCompoundDrawablesWithIntrinsicBounds(R.drawable.an_image, R.drawable.an_other_image, R.drawable.third_image, R.drawable.fourth_image);
+  public void
+      testSetCompoundDrawablesWithIntrinsicBounds_int_shouldCreateDrawablesWithResourceIds() {
+    textView.setCompoundDrawablesWithIntrinsicBounds(
+        R.drawable.an_image,
+        R.drawable.an_other_image,
+        R.drawable.third_image,
+        R.drawable.fourth_image);
 
-    assertEquals(R.drawable.an_image, shadowOf(textView.getCompoundDrawables()[0]).getCreatedFromResId());
-    assertEquals(R.drawable.an_other_image, shadowOf(textView.getCompoundDrawables()[1]).getCreatedFromResId());
-    assertEquals(R.drawable.third_image, shadowOf(textView.getCompoundDrawables()[2]).getCreatedFromResId());
-    assertEquals(R.drawable.fourth_image, shadowOf(textView.getCompoundDrawables()[3]).getCreatedFromResId());
+    assertEquals(
+        R.drawable.an_image, shadowOf(textView.getCompoundDrawables()[0]).getCreatedFromResId());
+    assertEquals(
+        R.drawable.an_other_image,
+        shadowOf(textView.getCompoundDrawables()[1]).getCreatedFromResId());
+    assertEquals(
+        R.drawable.third_image, shadowOf(textView.getCompoundDrawables()[2]).getCreatedFromResId());
+    assertEquals(
+        R.drawable.fourth_image,
+        shadowOf(textView.getCompoundDrawables()[3]).getCreatedFromResId());
   }
 
   @Test
-  public void testSetCompountDrawablesWithIntrinsicBounds_int_shouldNotCreateDrawablesForZero() throws Exception {
+  public void testSetCompoundDrawablesWithIntrinsicBounds_int_shouldNotCreateDrawablesForZero() {
     textView.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
 
     assertNull(textView.getCompoundDrawables()[0]);
@@ -365,14 +399,14 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void canSetAndGetTypeface() throws Exception {
+  public void canSetAndGetTypeface() {
     Typeface typeface = Shadow.newInstanceOf(Typeface.class);
     textView.setTypeface(typeface);
     assertSame(typeface, textView.getTypeface());
   }
 
   @Test
-  public void onTouchEvent_shouldCallMovementMethodOnTouchEventWithSetMotionEvent() throws Exception {
+  public void onTouchEvent_shouldCallMovementMethodOnTouchEventWithSetMotionEvent() {
     TestMovementMethod testMovementMethod = new TestMovementMethod();
     textView.setMovementMethod(testMovementMethod);
     textView.setLayoutParams(new FrameLayout.LayoutParams(100, 100));
@@ -389,14 +423,14 @@ public class ShadowTextViewTest {
     assertNull(textView.getError());
     CharSequence error = "myError";
     textView.setError(error);
-    assertEquals(error, textView.getError());
+    assertEquals(error.toString(), textView.getError().toString());
   }
 
   @Test
-  public void canSetAndGetInputFilters() throws Exception {
-    final InputFilter[] expectedFilters = new InputFilter[]{new InputFilter.LengthFilter(1)};
+  public void canSetAndGetInputFilters() {
+    final InputFilter[] expectedFilters = new InputFilter[] {new InputFilter.LengthFilter(1)};
     textView.setFilters(expectedFilters);
-    assertThat(textView.getFilters()).isSameAs(expectedFilters);
+    assertThat(textView.getFilters()).isSameInstanceAs(expectedFilters);
   }
 
   @Test
@@ -419,7 +453,8 @@ public class ShadowTextViewTest {
 
     textView.setText(null);
 
-    ArgumentCaptor<SpannableStringBuilder> builderCaptor = ArgumentCaptor.forClass(SpannableStringBuilder.class);
+    ArgumentCaptor<SpannableStringBuilder> builderCaptor =
+        ArgumentCaptor.forClass(SpannableStringBuilder.class);
     verify(mockTextWatcher).onTextChanged(builderCaptor.capture(), eq(0), eq(0), eq(0));
     assertThat(builderCaptor.getValue().toString()).isEmpty();
   }
@@ -437,8 +472,8 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void setTextSize_shouldHandleDips() throws Exception {
-    shadowOf(RuntimeEnvironment.application.getResources()).setDensity(1.5f);
+  public void setTextSize_shouldHandleDips() {
+    textView.getContext().getResources().getDisplayMetrics().density = 1.5f;
     textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
     assertThat(textView.getTextSize()).isEqualTo(15f);
     textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
@@ -446,19 +481,19 @@ public class ShadowTextViewTest {
   }
 
   @Test
-  public void setTextSize_shouldHandleSp() throws Exception {
+  public void setTextSize_shouldHandleSp() {
     textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
     assertThat(textView.getTextSize()).isEqualTo(10f);
 
-    shadowOf(RuntimeEnvironment.application.getResources()).setScaledDensity(1.5f);
+    textView.getContext().getResources().getDisplayMetrics().scaledDensity = 1.5f;
 
     textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
     assertThat(textView.getTextSize()).isEqualTo(15f);
   }
 
   @Test
-  public void setTextSize_shouldHandlePixels() throws Exception {
-    shadowOf(RuntimeEnvironment.application.getResources()).setDensity(1.5f);
+  public void setTextSize_shouldHandlePixels() {
+    textView.getContext().getResources().getDisplayMetrics().density = 1.5f;
     textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, 10);
     assertThat(textView.getTextSize()).isEqualTo(10f);
     textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, 20);
@@ -467,18 +502,22 @@ public class ShadowTextViewTest {
 
   @Test
   public void getPaintFlagsAndSetPaintFlags_shouldWork() {
-    assertThat(textView.getPaintFlags()).isEqualTo(0);
     textView.setPaintFlags(100);
     assertThat(textView.getPaintFlags()).isEqualTo(100);
   }
 
   @Test
   public void setCompoundDrawablesWithIntrinsicBounds_setsValues() {
-    textView.setCompoundDrawablesWithIntrinsicBounds(R.drawable.l0_red, R.drawable.l1_orange, R.drawable.l2_yellow, R.drawable.l3_green);
-    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsLeft()).isEqualTo(R.drawable.l0_red);
-    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsTop()).isEqualTo(R.drawable.l1_orange);
-    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsRight()).isEqualTo(R.drawable.l2_yellow);
-    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsBottom()).isEqualTo(R.drawable.l3_green);
+    textView.setCompoundDrawablesWithIntrinsicBounds(
+        R.drawable.l0_red, R.drawable.l1_orange, R.drawable.l2_yellow, R.drawable.l3_green);
+    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsLeft())
+        .isEqualTo(R.drawable.l0_red);
+    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsTop())
+        .isEqualTo(R.drawable.l1_orange);
+    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsRight())
+        .isEqualTo(R.drawable.l2_yellow);
+    assertThat(shadowOf(textView).getCompoundDrawablesWithIntrinsicBoundsBottom())
+        .isEqualTo(R.drawable.l3_green);
   }
 
   private List<MockTextWatcher> anyNumberOfTextWatchers() {
@@ -491,7 +530,10 @@ public class ShadowTextViewTest {
   }
 
   private void assertEachTextWatcherEventWasInvoked(MockTextWatcher mockTextWatcher) {
-    assertTrue("Expected each TextWatcher event to have been invoked once", mockTextWatcher.methodsCalled.size() == 3);
+    assertEquals(
+        "Expected each TextWatcher event to" + " have" + " been" + " invoked" + " once",
+        3,
+        mockTextWatcher.methodsCalled.size());
 
     assertThat(mockTextWatcher.methodsCalled.get(0)).isEqualTo("beforeTextChanged");
     assertThat(mockTextWatcher.methodsCalled.get(1)).isEqualTo("onTextChanged");
@@ -538,16 +580,13 @@ public class ShadowTextViewTest {
       methodsCalled.add("afterTextChanged");
       afterTextChangeArgument = s;
     }
-
   }
 
   private static class TestMovementMethod implements MovementMethod {
     public MotionEvent event;
-    public boolean touchEventWasCalled;
 
     @Override
-    public void initialize(TextView widget, Spannable text) {
-    }
+    public void initialize(TextView widget, Spannable text) {}
 
     @Override
     public boolean onKeyDown(TextView widget, Spannable text, int keyCode, KeyEvent event) {
@@ -565,8 +604,7 @@ public class ShadowTextViewTest {
     }
 
     @Override
-    public void onTakeFocus(TextView widget, Spannable text, int direction) {
-    }
+    public void onTakeFocus(TextView widget, Spannable text, int direction) {}
 
     @Override
     public boolean onTrackballEvent(TextView widget, Spannable text, MotionEvent event) {
@@ -576,7 +614,6 @@ public class ShadowTextViewTest {
     @Override
     public boolean onTouchEvent(TextView widget, Spannable text, MotionEvent event) {
       this.event = event;
-      touchEventWasCalled = true;
       return false;
     }
 
@@ -586,8 +623,7 @@ public class ShadowTextViewTest {
     }
 
     @Override
-    public boolean onGenericMotionEvent(TextView widget, Spannable text,
-                                        MotionEvent event) {
+    public boolean onGenericMotionEvent(TextView widget, Spannable text, MotionEvent event) {
       return false;
     }
   }

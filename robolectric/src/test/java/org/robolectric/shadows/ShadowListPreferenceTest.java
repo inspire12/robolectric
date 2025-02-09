@@ -1,33 +1,32 @@
 package org.robolectric.shadows;
 
-import android.app.Activity;
+import static com.google.common.truth.Truth.assertThat;
+
 import android.preference.ListPreference;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.R;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.Robolectric.buildActivity;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowListPreferenceTest {
 
   private ListPreference listPreference;
 
   @Before
   public void setUp() throws Exception {
-    listPreference = new ListPreference(buildActivity(Activity.class).create().get());
+    listPreference = new ListPreference(ApplicationProvider.getApplicationContext());
   }
 
   @Test
   public void shouldHaveEntries() {
-    CharSequence[] entries = { "this", "is", "only", "a", "test" };
+    CharSequence[] entries = {"this", "is", "only", "a", "test"};
 
     assertThat(listPreference.getEntries()).isNull();
     listPreference.setEntries(entries);
-    assertThat(listPreference.getEntries()).isSameAs(entries);
+    assertThat(listPreference.getEntries()).isSameInstanceAs(entries);
   }
 
   @Test
@@ -39,11 +38,11 @@ public class ShadowListPreferenceTest {
 
   @Test
   public void shouldHaveEntryValues() {
-    CharSequence[] entryValues = { "this", "is", "only", "a", "test" };
+    CharSequence[] entryValues = {"this", "is", "only", "a", "test"};
 
     assertThat(listPreference.getEntryValues()).isNull();
     listPreference.setEntryValues(entryValues);
-    assertThat(listPreference.getEntryValues()).isSameAs(entryValues);
+    assertThat(listPreference.getEntryValues()).isSameInstanceAs(entryValues);
   }
 
   @Test

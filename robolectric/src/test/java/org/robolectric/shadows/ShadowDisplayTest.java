@@ -1,28 +1,46 @@
 package org.robolectric.shadows;
 
+import static android.os.Build.VERSION_CODES.M;
+import static android.os.Build.VERSION_CODES.N;
+import static android.os.Build.VERSION_CODES.Q;
+import static android.os.Build.VERSION_CODES.TIRAMISU;
+import static android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.fail;
+
+import android.graphics.Insets;
 import android.graphics.Point;
 import android.graphics.Rect;
-import android.os.Build;
+import android.hardware.display.DisplayManagerGlobal;
 import android.util.DisplayMetrics;
 import android.view.Display;
+import android.view.Display.HdrCapabilities;
+import android.view.DisplayCutout;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 import org.robolectric.annotation.Config;
-import org.robolectric.internal.Shadow;
 
-import static org.junit.Assert.assertEquals;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowDisplayTest {
-  @Test
-  public void shouldProvideDisplayMetrics() throws Exception {
-    Display display = Shadow.newInstanceOf(Display.class);
-    ShadowDisplay shadow = Shadows.shadowOf(display);
 
+  private Display display;
+  private ShadowDisplay shadow;
+
+  @Before
+  public void setUp() throws Exception {
+    display = DisplayManagerGlobal.getInstance().getRealDisplay(Display.DEFAULT_DISPLAY);
+    shadow = Shadows.shadowOf(display);
+  }
+
+  @Test
+  public void shouldProvideDisplayMetrics() {
     shadow.setDensity(1.5f);
-    shadow.setDensityDpi(DisplayMetrics.DENSITY_MEDIUM);
+    shadow.setDensityDpi(DisplayMetrics.DENSITY_HIGH);
     shadow.setScaledDensity(1.6f);
     shadow.setWidth(1024);
     shadow.setHeight(600);
@@ -30,13 +48,14 @@ public class ShadowDisplayTest {
     shadow.setRealHeight(900);
     shadow.setXdpi(183.0f);
     shadow.setYdpi(184.0f);
+    shadow.setRefreshRate(123f);
 
     DisplayMetrics metrics = new DisplayMetrics();
 
     display.getMetrics(metrics);
 
     assertEquals(1.5f, metrics.density, 0.05);
-    assertEquals(DisplayMetrics.DENSITY_MEDIUM, metrics.densityDpi);
+    assertEquals(DisplayMetrics.DENSITY_HIGH, metrics.densityDpi);
     assertEquals(1.6f, metrics.scaledDensity, 0.05);
     assertEquals(1024, metrics.widthPixels);
     assertEquals(600, metrics.heightPixels);
@@ -48,23 +67,42 @@ public class ShadowDisplayTest {
     display.getRealMetrics(metrics);
 
     assertEquals(1.5f, metrics.density, 0.05);
-    assertEquals(DisplayMetrics.DENSITY_MEDIUM, metrics.densityDpi);
+    assertEquals(DisplayMetrics.DENSITY_HIGH, metrics.densityDpi);
     assertEquals(1.6f, metrics.scaledDensity, 0.05);
     assertEquals(1400, metrics.widthPixels);
     assertEquals(900, metrics.heightPixels);
     assertEquals(183.0f, metrics.xdpi, 0.05);
     assertEquals(184.0f, metrics.ydpi, 0.05);
+
+    assertEquals(0, 123f, display.getRefreshRate());
   }
 
   @Test
-  public void shouldProvideDisplaySize() throws Exception {
+  public void changedStateShouldApplyToOtherInstancesOfSameDisplay() {
+    shadow.setName("another name");
+    shadow.setWidth(1024);
+    shadow.setHeight(600);
+
+    display = DisplayManagerGlobal.getInstance().getRealDisplay(Display.DEFAULT_DISPLAY);
+    assertEquals(1024, display.getWidth());
+    assertEquals(600, display.getHeight());
+    assertEquals("another name", display.getName());
+  }
+
+  @Test
+  public void stateChangeShouldApplyToOtherInstancesOfSameDisplay() {
+    shadow.setState(Display.STATE_DOZE_SUSPEND);
+
+    display = DisplayManagerGlobal.getInstance().getRealDisplay(Display.DEFAULT_DISPLAY);
+    assertEquals(Display.STATE_DOZE_SUSPEND, display.getState());
+  }
+
+  @Test
+  public void shouldProvideDisplaySize() {
     Point outSmallestSize = new Point();
     Point outLargestSize = new Point();
     Point outSize = new Point();
     Rect outRect = new Rect();
-
-    Display display = Shadow.newInstanceOf(Display.class);
-    ShadowDisplay shadow = Shadows.shadowOf(display);
 
     shadow.setWidth(400);
     shadow.setHeight(600);
@@ -91,33 +129,148 @@ public class ShadowDisplayTest {
   }
 
   @Test
-  @Config(sdk = {
-      Build.VERSION_CODES.JELLY_BEAN_MR1,
-      Build.VERSION_CODES.JELLY_BEAN_MR2,
-      Build.VERSION_CODES.KITKAT,
-      Build.VERSION_CODES.LOLLIPOP })
-  public void shouldProvideDisplayInformation() {
-    Display display = Shadow.newInstanceOf(Display.class);
-    ShadowDisplay shadow = Shadows.shadowOf(display);
-
-    shadow.setDisplayId(42);
+  public void shouldProvideWeirdDisplayInformation() {
     shadow.setName("foo");
-    shadow.setFlags(8);
+    shadow.setFlags(123);
 
-    assertEquals(42, display.getDisplayId());
     assertEquals("foo", display.getName());
-    assertEquals(8, display.getFlags());
+    assertEquals(123, display.getFlags());
+
+    display = DisplayManagerGlobal.getInstance().getRealDisplay(Display.DEFAULT_DISPLAY);
+    assertEquals(123, display.getFlags());
   }
 
   /**
-   * The {@link android.view.Display#getOrientation()} method is deprecated, but for
-   * testing purposes, return the value gotten from {@link android.view.Display#getRotation()}
+   * The {@link android.view.Display#getOrientation()} method is deprecated, but for testing
+   * purposes, return the value gotten from {@link android.view.Display#getRotation()}
    */
   @Test
   public void deprecatedGetOrientation_returnsGetRotation() {
-    Display display = Shadow.newInstanceOf(Display.class);
     int testValue = 33;
-    Shadows.shadowOf(display).setRotation(testValue);
+    shadow.setRotation(testValue);
     assertEquals(testValue, display.getOrientation());
+  }
+
+  @Test
+  @Config(minSdk = N)
+  public void setDisplayHdrCapabilities_shouldReturnHdrCapabilities() {
+    Display display = ShadowDisplay.getDefaultDisplay();
+    int[] hdrCapabilities =
+        new int[] {HdrCapabilities.HDR_TYPE_HDR10, HdrCapabilities.HDR_TYPE_DOLBY_VISION};
+    shadow.setDisplayHdrCapabilities(
+        display.getDisplayId(),
+        /* maxLuminance= */ 100f,
+        /* maxAverageLuminance= */ 100f,
+        /* minLuminance= */ 100f,
+        hdrCapabilities);
+
+    HdrCapabilities capabilities = display.getHdrCapabilities();
+
+    assertThat(capabilities).isNotNull();
+    assertThat(capabilities.getSupportedHdrTypes()).isEqualTo(hdrCapabilities);
+    assertThat(capabilities.getDesiredMaxAverageLuminance()).isEqualTo(100f);
+    assertThat(capabilities.getDesiredMaxLuminance()).isEqualTo(100f);
+    assertThat(capabilities.getDesiredMinLuminance()).isEqualTo(100f);
+  }
+
+  @Test
+  @Config(maxSdk = M)
+  public void setDisplayHdrCapabilities_shouldThrowUnSupportedOperationExceptionPreN() {
+    Display display = ShadowDisplay.getDefaultDisplay();
+    int[] hdrCapabilities =
+        new int[] {HdrCapabilities.HDR_TYPE_HDR10, HdrCapabilities.HDR_TYPE_DOLBY_VISION};
+    try {
+      shadow.setDisplayHdrCapabilities(
+          display.getDisplayId(),
+          /* maxLuminance= */ 100f,
+          /* maxAverageLuminance= */ 100f,
+          /* minLuminance= */ 100f,
+          hdrCapabilities);
+      fail();
+    } catch (UnsupportedOperationException e) {
+      assertThat(e).hasMessageThat().contains("HDR capabilities are not supported below Android N");
+    }
+  }
+
+  @Test
+  @Config(minSdk = N)
+  public void setDisplayHdrCapabilities_shouldntThrowUnSupportedOperationExceptionNPlus() {
+    Display display = ShadowDisplay.getDefaultDisplay();
+    int[] hdrCapabilities =
+        new int[] {HdrCapabilities.HDR_TYPE_HDR10, HdrCapabilities.HDR_TYPE_DOLBY_VISION};
+
+    shadow.setDisplayHdrCapabilities(
+        display.getDisplayId(),
+        /* maxLuminance= */ 100f,
+        /* maxAverageLuminance= */ 100f,
+        /* minLuminance= */ 100f,
+        hdrCapabilities);
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void setHdrSdrRatio_greaterThanOne_getHdrSdrRatioShouldReturnExpectedRatio() {
+    shadow.setHdrSdrRatio(4.0f);
+
+    Display display = ShadowDisplay.getDefaultDisplay();
+    assertThat(display.getHdrSdrRatio()).isEqualTo(4.0f);
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void setHdrSdrRatio_one_getHdrSdrRatioShouldReturnExpectedRatio() {
+    shadow.setHdrSdrRatio(1.0f);
+
+    Display display = ShadowDisplay.getDefaultDisplay();
+    assertThat(display.getHdrSdrRatio()).isEqualTo(1.0f);
+  }
+
+  @Test
+  @Config(maxSdk = TIRAMISU)
+  public void setHdrSdrRatio_onAndroid_throwsUnsupportedOperationException() {
+    assertThrows(UnsupportedOperationException.class, () -> shadow.setHdrSdrRatio(1.0f));
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void getHdrSdrRatio_hdrSdrRatioNotSet_shouldReturnOne() {
+    Display display = ShadowDisplay.getDefaultDisplay();
+
+    assertThat(display.getHdrSdrRatio()).isEqualTo(1.0f);
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void isHdrSdrRatioAvailable_hasHdrSdrRatioGreaterThanOne_shouldReturnTrue() {
+    shadow.setHdrSdrRatio(4.0f);
+
+    Display display = ShadowDisplay.getDefaultDisplay();
+    assertThat(display.isHdrSdrRatioAvailable()).isTrue();
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void isHdrSdrRatioAvailable_hasHdrSdrRatioOfOne_shouldReturnTrue() {
+    shadow.setHdrSdrRatio(1.0f);
+
+    Display display = ShadowDisplay.getDefaultDisplay();
+    assertThat(display.isHdrSdrRatioAvailable()).isTrue();
+  }
+
+  @Test
+  @Config(minSdk = UPSIDE_DOWN_CAKE)
+  public void isHdrSdrRatioAvailable_hdrSdrRatioNotSet_shouldReturnFalse() {
+    Display display = ShadowDisplay.getDefaultDisplay();
+
+    assertThat(display.isHdrSdrRatioAvailable()).isFalse();
+  }
+
+  @Test
+  @Config(minSdk = Q)
+  public void setDisplayCutout_returnsCutout() {
+    DisplayCutout cutout = new DisplayCutout(Insets.of(0, 100, 0, 100), null, null, null, null);
+    shadow.setDisplayCutout(cutout);
+
+    assertEquals(cutout, display.getCutout());
   }
 }

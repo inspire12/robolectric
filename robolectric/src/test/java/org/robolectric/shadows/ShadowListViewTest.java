@@ -1,56 +1,58 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
 import static java.util.Arrays.asList;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.robolectric.RuntimeEnvironment.application;
+import static org.robolectric.RuntimeEnvironment.getApplication;
 import static org.robolectric.Shadows.shadowOf;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-import org.robolectric.util.Transcript;
-
+import android.app.Application;
 import android.util.SparseBooleanArray;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.util.ReflectionHelpers;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowListViewTest {
 
-  private Transcript transcript;
+  private List<String> transcript;
   private ListView listView;
   private int checkedItemPosition;
   private SparseBooleanArray checkedItemPositions;
   private int lastCheckedPosition;
+  private Application context;
 
   @Before
   public void setUp() throws Exception {
-    transcript = new Transcript();
-    listView = new ListView(RuntimeEnvironment.application);
+    transcript = new ArrayList<>();
+    context = ApplicationProvider.getApplicationContext();
+    listView = new ListView(context);
   }
 
   @Test
-  public void addHeaderView_ShouldRecordHeaders() throws Exception {
-    View view0 = new View(RuntimeEnvironment.application);
+  public void addHeaderView_ShouldRecordHeaders() {
+    View view0 = new View(context);
     view0.setId(0);
-    View view1 = new View(RuntimeEnvironment.application);
+    View view1 = new View(context);
     view1.setId(1);
-    View view2 = new View(RuntimeEnvironment.application);
+    View view2 = new View(context);
     view2.setId(2);
-    View view3 = new View(RuntimeEnvironment.application);
+    View view3 = new View(context);
     view3.setId(3);
     listView.addHeaderView(view0);
     listView.addHeaderView(view1);
@@ -58,67 +60,67 @@ public class ShadowListViewTest {
     listView.addHeaderView(view3, null, false);
     listView.setAdapter(new ShadowCountingAdapter(2));
     assertThat(listView.getHeaderViewsCount()).isEqualTo(4);
-    assertThat(shadowOf(listView).getHeaderViews().get(0)).isSameAs(view0);
-    assertThat(shadowOf(listView).getHeaderViews().get(1)).isSameAs(view1);
-    assertThat(shadowOf(listView).getHeaderViews().get(2)).isSameAs(view2);
-    assertThat(shadowOf(listView).getHeaderViews().get(3)).isSameAs(view3);
+    assertThat(shadowOf(listView).getHeaderViews().get(0)).isSameInstanceAs(view0);
+    assertThat(shadowOf(listView).getHeaderViews().get(1)).isSameInstanceAs(view1);
+    assertThat(shadowOf(listView).getHeaderViews().get(2)).isSameInstanceAs(view2);
+    assertThat(shadowOf(listView).getHeaderViews().get(3)).isSameInstanceAs(view3);
 
-    assertThat(listView.findViewById(0)).isNotNull();
-    assertThat(listView.findViewById(1)).isNotNull();
-    assertThat(listView.findViewById(2)).isNotNull();
-    assertThat(listView.findViewById(3)).isNotNull();
+    assertThat((View) listView.findViewById(0)).isNotNull();
+    assertThat((View) listView.findViewById(1)).isNotNull();
+    assertThat((View) listView.findViewById(2)).isNotNull();
+    assertThat((View) listView.findViewById(3)).isNotNull();
   }
 
   @Test
-  public void addHeaderView_shouldAttachTheViewToTheList() throws Exception {
-    View view = new View(RuntimeEnvironment.application);
+  public void addHeaderView_shouldAttachTheViewToTheList() {
+    View view = new View(context);
     view.setId(42);
 
     listView.addHeaderView(view);
 
-    assertThat(listView.findViewById(42)).isSameAs(view);
+    assertThat((View) listView.findViewById(42)).isSameInstanceAs(view);
   }
 
   @Test
-  public void addFooterView_ShouldRecordFooters() throws Exception {
-    View view0 = new View(RuntimeEnvironment.application);
-    View view1 = new View(RuntimeEnvironment.application);
+  public void addFooterView_ShouldRecordFooters() {
+    View view0 = new View(context);
+    View view1 = new View(context);
     listView.addFooterView(view0);
     listView.addFooterView(view1);
     listView.setAdapter(new ShadowCountingAdapter(3));
-    assertThat(shadowOf(listView).getFooterViews().get(0)).isSameAs(view0);
-    assertThat(shadowOf(listView).getFooterViews().get(1)).isSameAs(view1);
+    assertThat(shadowOf(listView).getFooterViews().get(0)).isSameInstanceAs(view0);
+    assertThat(shadowOf(listView).getFooterViews().get(1)).isSameInstanceAs(view1);
   }
 
   @Test
-  public void addFooterView_shouldAttachTheViewToTheList() throws Exception {
-    View view = new View(RuntimeEnvironment.application);
+  public void addFooterView_shouldAttachTheViewToTheList() {
+    View view = new View(context);
     view.setId(42);
 
     listView.addFooterView(view);
 
-    assertThat(listView.findViewById(42)).isSameAs(view);
+    assertThat((View) listView.findViewById(42)).isSameInstanceAs(view);
   }
 
   @Test
-  public void setAdapter_shouldNotClearHeaderOrFooterViews() throws Exception {
-    View header = new View(RuntimeEnvironment.application);
+  public void setAdapter_shouldNotClearHeaderOrFooterViews() {
+    View header = new View(context);
     listView.addHeaderView(header);
-    View footer = new View(RuntimeEnvironment.application);
+    View footer = new View(context);
     listView.addFooterView(footer);
 
     prepareListWithThreeItems();
 
     assertThat(listView.getChildCount()).isEqualTo(5);
-    assertThat(listView.getChildAt(0)).isSameAs(header);
-    assertThat(listView.getChildAt(4)).isSameAs(footer);
+    assertThat(listView.getChildAt(0)).isSameInstanceAs(header);
+    assertThat(listView.getChildAt(4)).isSameInstanceAs(footer);
   }
 
   @Test
-  public void testGetFooterViewsCount() throws Exception {
-    listView.addHeaderView(new View(RuntimeEnvironment.application));
-    listView.addFooterView(new View(RuntimeEnvironment.application));
-    listView.addFooterView(new View(RuntimeEnvironment.application));
+  public void testGetFooterViewsCount() {
+    listView.addHeaderView(new View(context));
+    listView.addFooterView(new View(context));
+    listView.addFooterView(new View(context));
 
     prepareListWithThreeItems();
 
@@ -126,114 +128,107 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void smoothScrollBy_shouldBeRecorded() throws Exception {
+  public void smoothScrollBy_shouldBeRecorded() {
     listView.smoothScrollBy(42, 420);
     assertThat(shadowOf(listView).getLastSmoothScrollByDistance()).isEqualTo(42);
     assertThat(shadowOf(listView).getLastSmoothScrollByDuration()).isEqualTo(420);
   }
 
   @Test
-  public void testPerformItemClick_ShouldFireOnItemClickListener() throws Exception {
-    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-      @Override
-      public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        transcript.add("item was clicked: " + position);
-      }
-    });
+  public void testPerformItemClick_ShouldFireOnItemClickListener() {
+    listView.setOnItemClickListener(
+        (parent, view, position, id) -> transcript.add("item was clicked: " + position));
 
     listView.performItemClick(null, 0, -1);
-    transcript.assertEventsSoFar("item was clicked: 0");
+    assertThat(transcript).containsExactly("item was clicked: 0");
   }
 
   @Test
-  public void testSetSelection_WhenNoItemSelectedListenerIsSet_ShouldDoNothing() throws Exception {
+  public void testSetSelection_WhenNoItemSelectedListenerIsSet_ShouldDoNothing() {
     listView.setSelection(0);
   }
 
   @Test
-  public void findItemContainingText_shouldFindChildByString() throws Exception {
+  public void findItemContainingText_shouldFindChildByString() {
     ShadowListView shadowListView = prepareListWithThreeItems();
     View item1 = shadowListView.findItemContainingText("Item 1");
-    assertThat(item1).isSameAs(listView.getChildAt(1));
+    assertThat(item1).isSameInstanceAs(listView.getChildAt(1));
   }
 
   @Test
-  public void findItemContainingText_shouldReturnNullIfNotFound() throws Exception {
+  public void findItemContainingText_shouldReturnNullIfNotFound() {
     ShadowListView shadowListView = prepareListWithThreeItems();
     assertThat(shadowListView.findItemContainingText("Non-existent item")).isNull();
   }
 
   @Test
-  public void clickItemContainingText_shouldPerformItemClickOnList() throws Exception {
+  public void clickItemContainingText_shouldPerformItemClickOnList() {
     ShadowListView shadowListView = prepareListWithThreeItems();
-    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-      @Override
-      public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        transcript.add("clicked on item " + position);
-      }
-    });
+    listView.setOnItemClickListener(
+        (parent, view, position, id) -> transcript.add("clicked on item " + position));
     shadowListView.clickFirstItemContainingText("Item 1");
-    transcript.assertEventsSoFar("clicked on item 1");
+    assertThat(transcript).containsExactly("clicked on item 1");
   }
 
   @Test
-  public void clickItemContainingText_shouldPerformItemClickOnList_arrayAdapter() throws Exception {
+  public void clickItemContainingText_shouldPerformItemClickOnList_arrayAdapter() {
     ArrayList<String> adapterFileList = new ArrayList<>();
     adapterFileList.add("Item 1");
     adapterFileList.add("Item 2");
     adapterFileList.add("Item 3");
-    final ArrayAdapter<String> adapter = new ArrayAdapter<>(application, android.R.layout.simple_list_item_1, adapterFileList);
+    final ArrayAdapter<String> adapter =
+        new ArrayAdapter<>(getApplication(), android.R.layout.simple_list_item_1, adapterFileList);
     listView.setAdapter(adapter);
     shadowOf(listView).populateItems();
     ShadowListView shadowListView = shadowOf(listView);
-    listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-      @Override
-      public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        transcript.add("clicked on item " + adapter.getItem(position));
-      }
-    });
+    listView.setOnItemClickListener(
+        (parent, view, position, id) ->
+            transcript.add("clicked on item " + adapter.getItem(position)));
     shadowListView.clickFirstItemContainingText("Item 3");
-    transcript.assertEventsSoFar("clicked on item Item 3");
+    assertThat(transcript).containsExactly("clicked on item Item 3");
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void clickItemContainingText_shouldThrowExceptionIfNotFound() throws Exception {
+  public void clickItemContainingText_shouldThrowExceptionIfNotFound() {
     ShadowListView shadowListView = prepareListWithThreeItems();
-    shadowListView.clickFirstItemContainingText("Non-existant item");
+    shadowListView.clickFirstItemContainingText("Non-existent item");
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void removeAllViews_shouldThrowAnException() throws Exception {
+  public void removeAllViews_shouldThrowAnException() {
     listView.removeAllViews();
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void removeView_shouldThrowAnException() throws Exception {
-    listView.removeView(new View(RuntimeEnvironment.application));
+  public void removeView_shouldThrowAnException() {
+    listView.removeView(new View(context));
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void removeViewAt_shouldThrowAnException() throws Exception {
+  public void removeViewAt_shouldThrowAnException() {
     listView.removeViewAt(0);
   }
 
   @Test
-  public void getPositionForView_shouldReturnThePositionInTheListForTheView() throws Exception {
+  public void getPositionForView_shouldReturnThePositionInTheListForTheView() {
     prepareWithListAdapter();
     View childViewOfListItem = ((ViewGroup) listView.getChildAt(1)).getChildAt(0);
     assertThat(listView.getPositionForView(childViewOfListItem)).isEqualTo(1);
   }
 
   @Test
-  public void getPositionForView_shouldReturnInvalidPositionForViewThatIsNotFound() throws Exception {
+  public void getPositionForView_shouldReturnInvalidPositionForViewThatIsNotFound() {
     prepareWithListAdapter();
-    View view = new View(RuntimeEnvironment.application);
-    shadowOf(view).setMyParent(new StubViewRoot()); // Android implementation requires the item have a parent
+    View view = new View(context);
+    shadowOf(view)
+        .setMyParent(
+            ReflectionHelpers.createNullProxy(
+                ViewParent.class)); // Android implementation requires the item have a parent
     assertThat(listView.getPositionForView(view)).isEqualTo(AdapterView.INVALID_POSITION);
   }
 
   @Test
-  public void shouldRecordLatestCallToSmoothScrollToPostion() throws Exception {
+  public void shouldRecordLatestCallToSmoothScrollToPosition() {
     listView.smoothScrollToPosition(10);
     assertThat(shadowOf(listView).getSmoothScrolledPosition()).isEqualTo(10);
   }
@@ -260,14 +255,15 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenNoItemsChecked_whenGettingCheckedItemOisition_thenReturnInvalidPosition() {
+  public void givenNoItemsChecked_whenGettingCheckedItemPosition_thenReturnInvalidPosition() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_SINGLE);
 
     assertThat(listView.getCheckedItemPosition()).isEqualTo(ListView.INVALID_POSITION);
   }
 
   @Test
-  public void givenChoiceModeIsSingleAndAnItemIsChecked_whenSettingChoiceModeToNone_thenGetCheckedItemPositionShouldReturnInvalidPosition() {
+  public void
+      givenChoiceModeIsSingleAndAnItemIsChecked_whenSettingChoiceModeToNone_thenGetCheckedItemPositionShouldReturnInvalidPosition() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_SINGLE).withAnyItemChecked();
 
     listView.setChoiceMode(ListView.CHOICE_MODE_NONE);
@@ -276,7 +272,8 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenChoiceModeIsMultipleAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnCheckedPositions() {
+  public void
+      givenChoiceModeIsMultipleAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnCheckedPositions() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_MULTIPLE).withAnyItemsChecked();
 
     assertThat(listView.getCheckedItemCount()).isEqualTo(checkedItemPositions.size());
@@ -286,7 +283,8 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenChoiceModeIsSingleAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnOnlyTheLastCheckedPosition() {
+  public void
+      givenChoiceModeIsSingleAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnOnlyTheLastCheckedPosition() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_SINGLE).withAnyItemsChecked();
 
     assertThat(listView.getCheckedItemPositions().get(lastCheckedPosition)).isTrue();
@@ -294,14 +292,16 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenChoiceModeIsNoneAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnNull() {
+  public void
+      givenChoiceModeIsNoneAndMultipleItemsAreChecked_whenGettingCheckedItemPositions_thenReturnNull() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_NONE).withAnyItemsChecked();
 
     assertNull(listView.getCheckedItemPositions());
   }
 
   @Test
-  public void givenItemIsNotCheckedAndChoiceModeIsSingle_whenPerformingItemClick_thenItemShouldBeChecked() {
+  public void
+      givenItemIsNotCheckedAndChoiceModeIsSingle_whenPerformingItemClick_thenItemShouldBeChecked() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_SINGLE);
     int positionToClick = anyListIndex();
 
@@ -311,7 +311,8 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenItemIsCheckedAndChoiceModeIsSingle_whenPerformingItemClick_thenItemShouldBeChecked() {
+  public void
+      givenItemIsCheckedAndChoiceModeIsSingle_whenPerformingItemClick_thenItemShouldBeChecked() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_SINGLE).withAnyItemChecked();
 
     listView.performItemClick(null, checkedItemPosition, 0);
@@ -320,7 +321,8 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenItemIsNotCheckedAndChoiceModeIsMultiple_whenPerformingItemClick_thenItemShouldBeChecked() {
+  public void
+      givenItemIsNotCheckedAndChoiceModeIsMultiple_whenPerformingItemClick_thenItemShouldBeChecked() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
     int positionToClick = anyListIndex();
 
@@ -331,7 +333,8 @@ public class ShadowListViewTest {
   }
 
   @Test
-  public void givenItemIsCheckedAndChoiceModeIsMultiple_whenPerformingItemClick_thenItemShouldNotBeChecked() {
+  public void
+      givenItemIsCheckedAndChoiceModeIsMultiple_whenPerformingItemClick_thenItemShouldNotBeChecked() {
     prepareListAdapter().withChoiceMode(ListView.CHOICE_MODE_MULTIPLE).withAnyItemChecked();
 
     listView.performItemClick(null, checkedItemPosition, 0);
@@ -343,11 +346,10 @@ public class ShadowListViewTest {
     return new ListAdapterBuilder();
   }
 
-  private ListAdapter prepareWithListAdapter() {
+  private void prepareWithListAdapter() {
     ListAdapter adapter = new ListAdapter("a", "b", "c");
     listView.setAdapter(adapter);
     shadowOf(listView).populateItems();
-    return adapter;
   }
 
   private ShadowListView prepareListWithThreeItems() {
@@ -385,8 +387,8 @@ public class ShadowListViewTest {
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
-      LinearLayout linearLayout = new LinearLayout(RuntimeEnvironment.application);
-      linearLayout.addView(new View(RuntimeEnvironment.application));
+      LinearLayout linearLayout = new LinearLayout(ApplicationProvider.getApplicationContext());
+      linearLayout.addView(new View(ApplicationProvider.getApplicationContext()));
       return linearLayout;
     }
   }
@@ -416,7 +418,6 @@ public class ShadowListViewTest {
         listView.setItemChecked(i, true);
         lastCheckedPosition = i;
       }
-
     }
   }
 }

@@ -1,153 +1,42 @@
 package org.robolectric.res;
 
-import org.junit.After;
+import static com.google.common.truth.Truth.assertThat;
+
+import java.nio.file.Path;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import org.robolectric.util.ReflectionHelpers;
+import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.robolectric.res.android.ResTable_config;
 
-import java.io.File;
-import java.lang.reflect.Field;
-
-import static org.mockito.Mockito.*;
-
+@RunWith(JUnit4.class)
 public class DrawableResourceLoaderNoRunnerTest {
-  private static final String JAR_SEPARATOR = "/";
-  private static final String UNIX_SEPARATOR = "/";
-  private static final String WINDOWS_SEPARATOR = "\\";
-  private static final String JAR_SCHEME = "jar:";
-  private static final String DRAWABLE_DIR = "drawable";
-  private static final String FILE_PATH_ON_UNIX = UNIX_SEPARATOR + "foo"
-      + UNIX_SEPARATOR + DRAWABLE_DIR;
-  private static final String FILE_PATH_ON_WINDOWS = "C:"
-      + WINDOWS_SEPARATOR + "foo"
-      + WINDOWS_SEPARATOR + DRAWABLE_DIR;
-  private static final String JAR_PATH_ON_UNIX = JAR_SCHEME + UNIX_SEPARATOR + "foo"
-      + UNIX_SEPARATOR + "bar.jar!"
-      + JAR_SEPARATOR + DRAWABLE_DIR;
-  private static final String JAR_PATH_ON_WINDOWS = JAR_SCHEME + "C:"
-      + WINDOWS_SEPARATOR + "foo"
-      + WINDOWS_SEPARATOR + "bar.jar!"
-      + JAR_SEPARATOR + DRAWABLE_DIR;
 
-  private String originalSeparator;
+  @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  @After
-  public void tearDown() throws Exception {
-    if (originalSeparator != null) {
-      Field field = File.class.getDeclaredField("separator");
-      ReflectionHelpers.setStaticField(field, originalSeparator);
-      originalSeparator = null;
-    }
+  private PackageResourceTable resourceTable;
+
+  @Before
+  public void setUp() {
+    resourceTable = new ResourceTableFactory().newResourceTable("org.robolectric");
   }
 
   @Test
-  public void shouldFindDrawableResourcesWorkWithUnixJarFilePath() throws Exception {
-    setFileSeparator(UNIX_SEPARATOR);
+  public void shouldFindDrawableResources() throws Exception {
+    Path testBaseDir = temporaryFolder.newFolder("res").toPath();
+    temporaryFolder.newFolder("res", "drawable");
+    temporaryFolder.newFile("res/drawable/foo.png");
+    ResourcePath resourcePath = new ResourcePath(null, testBaseDir, null);
 
-    Fs.JarFs.JarFsFile mockTestFile = mock(Fs.JarFs.JarFsFile.class);
-    when(mockTestFile.getName()).thenReturn("foo.png");
-    when(mockTestFile.getBaseName()).thenReturn("bar.png");
+    DrawableResourceLoader testLoader = new DrawableResourceLoader(resourceTable);
+    testLoader.findDrawableResources(resourcePath);
 
-    Fs.JarFs.JarFsFile mockTestDir = mock(Fs.JarFs.JarFsFile.class);
-    when(mockTestDir.toString()).thenReturn(JAR_PATH_ON_UNIX);
-    when(mockTestDir.getName()).thenReturn(DRAWABLE_DIR);
-    when(mockTestDir.listFiles()).thenReturn(new FsFile[]{mockTestFile});
-    when(mockTestDir.isDirectory()).thenReturn(true);
-    FsFile mockTestBaseDir = mock(FsFile.class);
-    when(mockTestBaseDir.listFiles()).thenReturn(new FsFile[]{mockTestDir});
-    ResourcePath mockResourcePath = mock(ResourcePath.class);
-    setResourceBase(mockTestBaseDir, mockResourcePath);
-
-    ResBundle<DrawableNode> bundle = mock(ResBundle.class);
-    DrawableResourceLoader testLoader = new DrawableResourceLoader(bundle);
-    testLoader.findDrawableResources(mockResourcePath);
-
-    verify(bundle).put(eq("drawable"), eq("bar.png"), (DrawableNode) any(), (XmlLoader.XmlContext) any());
-  }
-
-  @Test
-  public void shouldFindDrawableResourcesWorkWithUnixFilePath() throws Exception {
-    setFileSeparator(UNIX_SEPARATOR);
-
-    FileFsFile mockTestFile = mock(FileFsFile.class);
-    when(mockTestFile.getName()).thenReturn("foo.png");
-    when(mockTestFile.getBaseName()).thenReturn("bar.png");
-
-    FileFsFile mockTestDir = mock(FileFsFile.class);
-    when(mockTestDir.toString()).thenReturn(FILE_PATH_ON_UNIX);
-    when(mockTestDir.getName()).thenReturn(DRAWABLE_DIR);
-    when(mockTestDir.listFiles()).thenReturn(new FsFile[]{mockTestFile});
-    when(mockTestDir.isDirectory()).thenReturn(true);
-    FsFile mockTestBaseDir = mock(FsFile.class);
-    when(mockTestBaseDir.listFiles()).thenReturn(new FsFile[]{mockTestDir});
-    ResourcePath mockResourcePath = mock(ResourcePath.class);
-    setResourceBase(mockTestBaseDir, mockResourcePath);
-
-    ResBundle<DrawableNode> bundle = mock(ResBundle.class);
-    DrawableResourceLoader testLoader = new DrawableResourceLoader(bundle);
-    testLoader.findDrawableResources(mockResourcePath);
-
-    verify(bundle).put(eq("drawable"), eq("bar.png"), (DrawableNode) any(), (XmlLoader.XmlContext) any());
-  }
-
-  @Test
-  public void shouldFindDrawableResourcesWorkWithWindowsJarFilePath() throws Exception {
-    setFileSeparator(WINDOWS_SEPARATOR);
-
-    Fs.JarFs.JarFsFile mockTestFile = mock(Fs.JarFs.JarFsFile.class);
-    when(mockTestFile.getName()).thenReturn("foo.png");
-    when(mockTestFile.getBaseName()).thenReturn("bar.png");
-
-    Fs.JarFs.JarFsFile mockTestDir = mock(Fs.JarFs.JarFsFile.class);
-    when(mockTestDir.toString()).thenReturn(JAR_PATH_ON_WINDOWS);
-    when(mockTestDir.getName()).thenReturn(DRAWABLE_DIR);
-    when(mockTestDir.listFiles()).thenReturn(new FsFile[]{mockTestFile});
-    when(mockTestDir.isDirectory()).thenReturn(true);
-    FsFile mockTestBaseDir = mock(FsFile.class);
-    when(mockTestBaseDir.listFiles()).thenReturn(new FsFile[]{mockTestDir});
-    ResourcePath mockResourcePath = mock(ResourcePath.class);
-    setResourceBase(mockTestBaseDir, mockResourcePath);
-
-    ResBundle<DrawableNode> bundle = mock(ResBundle.class);
-    DrawableResourceLoader testLoader = new DrawableResourceLoader(bundle);
-    testLoader.findDrawableResources(mockResourcePath);
-
-    verify(bundle).put(eq("drawable"), eq("bar.png"), (DrawableNode) any(), (XmlLoader.XmlContext) any());
-  }
-
-  @Test
-  public void shouldFindDrawableResourcesWorkWithWindowsFilePath() throws Exception {
-    setFileSeparator(WINDOWS_SEPARATOR);
-
-    FileFsFile mockTestFile = mock(FileFsFile.class);
-    when(mockTestFile.getName()).thenReturn("foo.png");
-    when(mockTestFile.getBaseName()).thenReturn("bar.png");
-
-    FileFsFile mockTestDir = mock(FileFsFile.class);
-    when(mockTestDir.toString()).thenReturn(FILE_PATH_ON_WINDOWS);
-    when(mockTestDir.getName()).thenReturn(DRAWABLE_DIR);
-    when(mockTestDir.listFiles()).thenReturn(new FsFile[]{mockTestFile});
-    when(mockTestDir.isDirectory()).thenReturn(true);
-    FsFile mockTestBaseDir = mock(FsFile.class);
-    when(mockTestBaseDir.listFiles()).thenReturn(new FsFile[]{mockTestDir});
-    ResourcePath mockResourcePath = mock(ResourcePath.class);
-    setResourceBase(mockTestBaseDir, mockResourcePath);
-
-    ResBundle<DrawableNode> bundle = mock(ResBundle.class);
-    DrawableResourceLoader testLoader = new DrawableResourceLoader(bundle);
-    testLoader.findDrawableResources(mockResourcePath);
-
-    verify(bundle).put(eq("drawable"), eq("bar.png"), (DrawableNode) any(), (XmlLoader.XmlContext) any());
-  }
-
-  private void setFileSeparator(String separator) throws Exception {
-    Field field = File.class.getDeclaredField("separator");
-    originalSeparator = ReflectionHelpers.getStaticField(field);
-    ReflectionHelpers.setStaticField(field, separator);
-  }
-
-  private void setResourceBase(FsFile mockTestBaseDir, ResourcePath mockResourcePath) throws NoSuchFieldException, IllegalAccessException {
-    Field resourceBase = ResourcePath.class.getDeclaredField("resourceBase");
-    resourceBase.setAccessible(true);
-    resourceBase.set(mockResourcePath, mockTestBaseDir);
+    assertThat(
+            resourceTable
+                .getValue(new ResName("org.robolectric", "drawable", "foo"), new ResTable_config())
+                .isFile())
+        .isTrue();
   }
 }

@@ -1,17 +1,17 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.util.LruCache;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowLruTest {
 
   @Test
-  public void shouldLru() throws Exception {
+  public void shouldLru() {
     LruCache<Integer, String> lruCache = new LruCache<>(2);
     lruCache.put(1, "one");
     lruCache.put(2, "two");

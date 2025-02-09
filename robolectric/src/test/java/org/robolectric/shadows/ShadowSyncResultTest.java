@@ -1,26 +1,25 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import android.content.SyncResult;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertTrue;
-import static org.assertj.core.api.Assertions.assertThat;
-
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowSyncResultTest {
 
   @Test
-  public void testConstructor() throws Exception {
+  public void testConstructor() {
     SyncResult result = new SyncResult();
     assertThat(result.stats).isNotNull();
   }
 
   @Test
-  public void hasSoftError() throws Exception {
+  public void hasSoftError() {
     SyncResult result = new SyncResult();
     assertFalse(result.hasSoftError());
     result.stats.numIoExceptions++;
@@ -29,7 +28,7 @@ public class ShadowSyncResultTest {
   }
 
   @Test
-  public void hasHardError() throws Exception {
+  public void hasHardError() {
     SyncResult result = new SyncResult();
     assertFalse(result.hasHardError());
     result.stats.numAuthExceptions++;
@@ -38,7 +37,7 @@ public class ShadowSyncResultTest {
   }
 
   @Test
-  public void testMadeSomeProgress() throws Exception {
+  public void testMadeSomeProgress() {
     SyncResult result = new SyncResult();
     assertFalse(result.madeSomeProgress());
     result.stats.numInserts++;
@@ -46,7 +45,7 @@ public class ShadowSyncResultTest {
   }
 
   @Test
-  public void testClear() throws Exception {
+  public void testClear() {
     SyncResult result = new SyncResult();
     result.moreRecordsToGet = true;
     result.stats.numInserts++;

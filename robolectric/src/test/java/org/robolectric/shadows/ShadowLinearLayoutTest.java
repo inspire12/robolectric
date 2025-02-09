@@ -1,30 +1,30 @@
 package org.robolectric.shadows;
 
-import android.view.Gravity;
-import android.widget.LinearLayout;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertSame;
 import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+import android.view.Gravity;
+import android.widget.LinearLayout;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+@RunWith(AndroidJUnit4.class)
 public class ShadowLinearLayoutTest {
   private LinearLayout linearLayout;
   private ShadowLinearLayout shadow;
 
   @Before
-  public void setup() throws Exception {
-    linearLayout = new LinearLayout(RuntimeEnvironment.application);
+  public void setup() {
+    linearLayout = new LinearLayout(ApplicationProvider.getApplicationContext());
     shadow = shadowOf(linearLayout);
   }
 
   @Test
-  public void getLayoutParams_shouldReturnTheSameLinearLayoutParamsFromTheSetter() throws Exception {
+  public void getLayoutParams_shouldReturnTheSameLinearLayoutParamsFromTheSetter() {
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(1, 2);
     linearLayout.setLayoutParams(params);
 
@@ -32,7 +32,7 @@ public class ShadowLinearLayoutTest {
   }
 
   @Test
-  public void canAnswerOrientation() throws Exception {
+  public void canAnswerOrientation() {
     assertThat(linearLayout.getOrientation()).isEqualTo(LinearLayout.HORIZONTAL);
     linearLayout.setOrientation(LinearLayout.VERTICAL);
     assertThat(linearLayout.getOrientation()).isEqualTo(LinearLayout.VERTICAL);
@@ -41,7 +41,7 @@ public class ShadowLinearLayoutTest {
   }
 
   @Test
-  public void canAnswerGravity() throws Exception {
+  public void canAnswerGravity() {
     assertThat(shadow.getGravity()).isEqualTo(Gravity.TOP | Gravity.START);
     linearLayout.setGravity(Gravity.CENTER_VERTICAL); // Only affects horizontal.
     assertThat(shadow.getGravity()).isEqualTo(Gravity.CENTER_VERTICAL | Gravity.START);

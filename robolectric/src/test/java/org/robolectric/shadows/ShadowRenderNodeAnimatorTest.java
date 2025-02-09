@@ -1,30 +1,24 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.shadows.ShadowLooper.shadowMainLooper;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.app.Activity;
 import android.os.Build;
 import android.view.View;
 import android.view.ViewAnimationUtils;
-
-import com.google.common.collect.Ordering;
-
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.Config;
 import org.robolectric.Robolectric;
-import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
+import org.robolectric.annotation.GraphicsMode;
+import org.robolectric.annotation.GraphicsMode.Mode;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
-@Config(sdk = {
-  Build.VERSION_CODES.LOLLIPOP,
-  Build.VERSION_CODES.LOLLIPOP_MR1,
-  Build.VERSION_CODES.M,
-})
+@RunWith(AndroidJUnit4.class)
+@GraphicsMode(Mode.LEGACY)
 public class ShadowRenderNodeAnimatorTest {
   private Activity activity;
   private View view;
@@ -32,7 +26,7 @@ public class ShadowRenderNodeAnimatorTest {
 
   @Before
   public void setUp() {
-    activity = Robolectric.setupActivity(Activity.class);
+    activity = Robolectric.buildActivity(Activity.class).setup().get();
     view = new View(activity);
     activity.setContentView(view);
     listener = new TestListener();
@@ -44,6 +38,7 @@ public class ShadowRenderNodeAnimatorTest {
     animator.addListener(listener);
     animator.start();
 
+    shadowMainLooper().idle();
     assertThat(listener.startCount).isEqualTo(1);
     assertThat(listener.endCount).isEqualTo(1);
   }
@@ -53,7 +48,7 @@ public class ShadowRenderNodeAnimatorTest {
     Animator animator = ViewAnimationUtils.createCircularReveal(view, 10, 10, 10f, 100f);
     animator.addListener(listener);
 
-    Robolectric.getForegroundThreadScheduler().pause();
+    shadowMainLooper().pause();
     animator.start();
     animator.cancel();
 
@@ -70,6 +65,7 @@ public class ShadowRenderNodeAnimatorTest {
 
     animator.start();
 
+    shadowMainLooper().idle();
     assertThat(listener.startCount).isEqualTo(1);
     assertThat(listener.endCount).isEqualTo(1);
   }
@@ -100,6 +96,8 @@ public class ShadowRenderNodeAnimatorTest {
 
     animator.end();
 
+    shadowMainLooper().idle();
+
     // This behavior changed between L and L MR1. In older versions, onAnimationEnd would always be
     // called without any guarantee that onAnimationStart had been called first.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
@@ -116,7 +114,7 @@ public class ShadowRenderNodeAnimatorTest {
     Animator animator = ViewAnimationUtils.createCircularReveal(view, 10, 10, 10f, 100f);
     animator.addListener(listener);
 
-    Robolectric.getForegroundThreadScheduler().pause();
+    shadowMainLooper().pause();
     animator.start();
     animator.cancel();
     animator.cancel();
@@ -131,7 +129,7 @@ public class ShadowRenderNodeAnimatorTest {
     Animator animator = ViewAnimationUtils.createCircularReveal(view, 10, 10, 10f, 100f);
     animator.addListener(listener);
 
-    Robolectric.getForegroundThreadScheduler().pause();
+    shadowMainLooper().pause();
     animator.start();
     animator.end();
     animator.end();
@@ -146,7 +144,7 @@ public class ShadowRenderNodeAnimatorTest {
     animator.setStartDelay(1000);
     animator.addListener(listener);
 
-    Robolectric.getForegroundThreadScheduler().pause();
+    shadowMainLooper().pause();
     animator.start();
     animator.cancel();
 

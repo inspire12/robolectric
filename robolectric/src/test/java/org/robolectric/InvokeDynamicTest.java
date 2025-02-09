@@ -1,5 +1,8 @@
 package org.robolectric;
 
+import static com.google.common.truth.Truth.assertThat;
+
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.annotation.Config;
@@ -7,12 +10,10 @@ import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.RealObject;
 import org.robolectric.annotation.internal.Instrument;
-import org.robolectric.internal.Shadow;
-import org.robolectric.internal.ShadowExtractor;
+import org.robolectric.shadow.api.Shadow;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.WithDefaults.class)
+@RunWith(AndroidJUnit4.class)
+@Config(sdk = Config.NEWEST_SDK)
 public class InvokeDynamicTest {
   @Test
   @Config(shadows = {DoNothingShadow.class})
@@ -25,7 +26,7 @@ public class InvokeDynamicTest {
   @Config(shadows = {RealShadow.class})
   public void directlyOn() {
     Real real = new Real();
-    RealShadow shadow = (RealShadow) ShadowExtractor.extract(real);
+    RealShadow shadow = Shadow.extract(real);
 
     assertThat(real.x).isEqualTo(-1);
     assertThat(shadow.x).isEqualTo(-2);
@@ -68,8 +69,7 @@ public class InvokeDynamicTest {
   public static class RealCopy {
     public int x;
 
-    public void setX(int x) {
-    }
+    public void setX(int x) {}
   }
 
   @Implements(Real.class)
@@ -79,7 +79,7 @@ public class InvokeDynamicTest {
     public int x = -2;
 
     @Implementation
-    public void setX(int x) {
+    protected void setX(int x) {
       this.x = x;
       real.x = -x;
     }
@@ -90,7 +90,7 @@ public class InvokeDynamicTest {
     @RealObject RealCopy real;
 
     @Implementation
-    public void setX(int x) {
+    protected void setX(int x) {
       real.x = 1;
     }
   }
@@ -100,7 +100,7 @@ public class InvokeDynamicTest {
     @RealObject RealCopy real;
 
     @Implementation
-    public void setX(int x) {
+    protected void setX(int x) {
       real.x = 2;
     }
   }
@@ -113,7 +113,5 @@ public class InvokeDynamicTest {
   }
 
   @Implements(value = DoNothing.class, callThroughByDefault = false)
-  public static class DoNothingShadow {
-
-  }
+  public static class DoNothingShadow {}
 }

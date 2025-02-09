@@ -1,5 +1,10 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import android.content.ContentResolver;
 import android.database.CharArrayBuffer;
 import android.database.ContentObserver;
@@ -8,22 +13,18 @@ import android.database.CursorWrapper;
 import android.database.DataSetObserver;
 import android.net.Uri;
 import android.os.Bundle;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.lang.reflect.Method;
+import java.util.HashMap;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 
-import java.lang.reflect.Method;
-import java.util.HashMap;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowCursorWrapperTest {
 
-  private class ForwardVerifier {
+  private static class ForwardVerifier {
 
     final Cursor mockCursor;
     final CursorWrapper cursorWrapper;
@@ -48,7 +49,6 @@ public class ShadowCursorWrapperTest {
       method.invoke(verify(mockCursor, times(1)), params);
       Mockito.verifyNoMoreInteractions(mockCursor);
     }
-
   }
 
   @Test
@@ -94,7 +94,6 @@ public class ShadowCursorWrapperTest {
     v.verifyForward("setNotificationUri", mock(ContentResolver.class), mock(Uri.class));
     v.verifyForward("unregisterContentObserver", mock(ContentObserver.class));
     v.verifyForward("unregisterDataSetObserver", mock(DataSetObserver.class));
-
   }
 
   @Test
@@ -103,7 +102,6 @@ public class ShadowCursorWrapperTest {
     CursorWrapper cursorWrapper = new CursorWrapper(mockCursor);
     ShadowCursorWrapper shadow = Shadows.shadowOf(cursorWrapper);
 
-    assertThat(shadow.getWrappedCursor()).isSameAs(mockCursor);
+    assertThat(shadow.getWrappedCursor()).isSameInstanceAs(mockCursor);
   }
-
 }

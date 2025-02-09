@@ -1,108 +1,131 @@
 package org.robolectric.shadows;
 
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.annotation.Config;
-import org.robolectric.TestRunners;
 import static android.content.Context.WIFI_SERVICE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.RuntimeEnvironment.application;
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.RuntimeEnvironment.getApplication;
 import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.net.InetAddress;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+@RunWith(AndroidJUnit4.class)
 public class ShadowWifiInfoTest {
+
+  private WifiManager wifiManager;
+
+  @Before
+  public void setUp() {
+    wifiManager = (WifiManager) getApplication().getSystemService(WIFI_SERVICE);
+  }
+
+  @Test
+  public void newInstance_shouldNotCrash() {
+    assertThat(ShadowWifiInfo.newInstance()).isNotNull();
+  }
+
+  @Test
+  public void shouldReturnIpAddress() throws Exception {
+    String ipAddress = "192.168.0.1";
+    int expectedIpAddress = 16820416;
+
+    WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+    shadowOf(wifiInfo).setInetAddress(InetAddress.getByName(ipAddress));
+    assertThat(wifiInfo.getIpAddress()).isEqualTo(expectedIpAddress);
+  }
 
   @Test
   public void shouldReturnMacAddress() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
+
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-    assertThat(wifiInfo.getMacAddress())
-        .isEqualTo("02:00:00:00:00:00"); // WifiInfo.DEFAULT_MAC_ADDRESS
 
     shadowOf(wifiInfo).setMacAddress("mac address");
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getMacAddress()).isEqualTo("mac address");
   }
 
   @Test
   public void shouldReturnSSID() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-    assertThat(wifiInfo.getSSID()).isEqualTo("<unknown ssid>"); // WifiSsid.NONE
 
     shadowOf(wifiInfo).setSSID("SSID");
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
-    assertThat(wifiInfo.getSSID()).isEqualTo("SSID");
+    assertThat(wifiInfo.getSSID()).contains("SSID");
   }
 
   @Test
   public void shouldReturnBSSID() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getBSSID()).isEqualTo(null);
 
     shadowOf(wifiInfo).setBSSID("BSSID");
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getBSSID()).isEqualTo("BSSID");
   }
 
   @Test
   public void shouldReturnRssi() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-    assertThat(wifiInfo.getRssi()).isEqualTo(-127); // WifiInfo.INVALID_RSSI
 
     shadowOf(wifiInfo).setRssi(10);
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getRssi()).isEqualTo(10);
   }
 
   @Test
   public void shouldReturnLinkSpeed() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getLinkSpeed()).isEqualTo(-1);
 
     shadowOf(wifiInfo).setLinkSpeed(10);
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getLinkSpeed()).isEqualTo(10);
   }
 
-  @Test @Config(sdk = 21)
+  @Test
   public void shouldReturnFrequency() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getFrequency()).isEqualTo(-1);
 
     shadowOf(wifiInfo).setFrequency(10);
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getFrequency()).isEqualTo(10);
   }
 
   @Test
   public void shouldReturnNetworkId() {
-    WifiManager wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     WifiInfo wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getNetworkId()).isEqualTo(-1);
 
     shadowOf(wifiInfo).setNetworkId(10);
 
-    wifiManager = (WifiManager) application.getSystemService(WIFI_SERVICE);
     wifiInfo = wifiManager.getConnectionInfo();
     assertThat(wifiInfo.getNetworkId()).isEqualTo(10);
+  }
+
+  @Test
+  public void shouldReturnSupplicantState() {
+    WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+
+    shadowOf(wifiInfo).setSupplicantState(SupplicantState.COMPLETED);
+
+    wifiInfo = wifiManager.getConnectionInfo();
+    assertThat(wifiInfo.getSupplicantState()).isEqualTo(SupplicantState.COMPLETED);
+
+    shadowOf(wifiInfo).setSupplicantState(SupplicantState.DISCONNECTED);
+
+    wifiInfo = wifiManager.getConnectionInfo();
+    assertThat(wifiInfo.getSupplicantState()).isEqualTo(SupplicantState.DISCONNECTED);
   }
 }

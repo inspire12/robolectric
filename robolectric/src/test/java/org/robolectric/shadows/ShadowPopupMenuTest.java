@@ -1,19 +1,17 @@
 package org.robolectric.shadows;
 
-import android.view.MenuItem;
+import static com.google.common.truth.Truth.assertThat;
+import static org.robolectric.Shadows.shadowOf;
+
 import android.view.View;
 import android.widget.PopupMenu;
-
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.robolectric.Shadows.shadowOf;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowPopupMenuTest {
 
   private PopupMenu popupMenu;
@@ -21,50 +19,45 @@ public class ShadowPopupMenuTest {
 
   @Before
   public void setUp() {
-    View anchorView = new View(RuntimeEnvironment.application);
-    popupMenu = new PopupMenu(RuntimeEnvironment.application, anchorView);
+    View anchorView = new View(ApplicationProvider.getApplicationContext());
+    popupMenu = new PopupMenu(ApplicationProvider.getApplicationContext(), anchorView);
     shadowPopupMenu = shadowOf(popupMenu);
   }
 
   @Test
-  public void testIsShowing_returnsFalseUponCreation() throws Exception {
+  public void testIsShowing_returnsFalseUponCreation() {
     assertThat(shadowPopupMenu.isShowing()).isFalse();
   }
 
   @Test
-  public void testIsShowing_returnsTrueIfShown() throws Exception {
+  public void testIsShowing_returnsTrueIfShown() {
     popupMenu.show();
     assertThat(shadowPopupMenu.isShowing()).isTrue();
   }
 
   @Test
-  public void testIsShowing_returnsFalseIfShownThenDismissed() throws Exception {
+  public void testIsShowing_returnsFalseIfShownThenDismissed() {
     popupMenu.show();
     popupMenu.dismiss();
     assertThat(shadowPopupMenu.isShowing()).isFalse();
   }
 
   @Test
-  public void getLatestPopupMenu_returnsNullUponCreation() throws Exception {
+  public void getLatestPopupMenu_returnsNullUponCreation() {
     assertThat(ShadowPopupMenu.getLatestPopupMenu()).isNull();
   }
 
   @Test
-  public void getLatestPopupMenu_returnsLastMenuShown() throws Exception {
+  public void getLatestPopupMenu_returnsLastMenuShown() {
     popupMenu.show();
     assertThat(ShadowPopupMenu.getLatestPopupMenu()).isEqualTo(popupMenu);
   }
 
   @Test
-  public void getOnClickListener_returnsOnClickListener() throws Exception {
+  public void getOnClickListener_returnsOnClickListener() {
     assertThat(shadowOf(popupMenu).getOnMenuItemClickListener()).isNull();
 
-    PopupMenu.OnMenuItemClickListener listener = new PopupMenu.OnMenuItemClickListener() {
-      @Override
-      public boolean onMenuItemClick(MenuItem menuItem) {
-        return false;
-      }
-    };
+    PopupMenu.OnMenuItemClickListener listener = menuItem -> false;
     popupMenu.setOnMenuItemClickListener(listener);
 
     assertThat(shadowOf(popupMenu).getOnMenuItemClickListener()).isEqualTo(listener);

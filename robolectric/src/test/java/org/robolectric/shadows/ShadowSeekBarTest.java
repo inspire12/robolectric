@@ -1,36 +1,37 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.widget.SeekBar;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
-import org.robolectric.util.Transcript;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowSeekBarTest {
 
   private SeekBar seekBar;
   private ShadowSeekBar shadow;
   private SeekBar.OnSeekBarChangeListener listener;
-  private Transcript transcript;
+  private List<String> transcript;
 
   @Before
   public void setup() {
-    seekBar = new SeekBar(RuntimeEnvironment.application);
+    seekBar = new SeekBar(ApplicationProvider.getApplicationContext());
     shadow = Shadows.shadowOf(seekBar);
     listener = new TestSeekBarChangedListener();
-    transcript = new Transcript();
+    transcript = new ArrayList<>();
     seekBar.setOnSeekBarChangeListener(listener);
   }
 
   @Test
   public void testOnSeekBarChangedListener() {
-    assertThat(shadow.getOnSeekBarChangeListener()).isSameAs(listener);
+    assertThat(shadow.getOnSeekBarChangeListener()).isSameInstanceAs(listener);
     seekBar.setOnSeekBarChangeListener(null);
     assertThat(shadow.getOnSeekBarChangeListener()).isNull();
   }
@@ -38,7 +39,7 @@ public class ShadowSeekBarTest {
   @Test
   public void testOnChangeNotification() {
     seekBar.setProgress(5);
-    transcript.assertEventsSoFar("onProgressChanged() - 5");
+    assertThat(transcript).containsExactly("onProgressChanged() - 5");
   }
 
   private class TestSeekBarChangedListener implements SeekBar.OnSeekBarChangeListener {
@@ -49,11 +50,9 @@ public class ShadowSeekBarTest {
     }
 
     @Override
-    public void onStartTrackingTouch(SeekBar seekBar) {
-    }
+    public void onStartTrackingTouch(SeekBar seekBar) {}
 
     @Override
-    public void onStopTrackingTouch(SeekBar seekBar) {
-    }
+    public void onStopTrackingTouch(SeekBar seekBar) {}
   }
 }

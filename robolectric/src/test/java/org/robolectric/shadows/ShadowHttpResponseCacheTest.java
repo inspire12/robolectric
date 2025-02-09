@@ -1,16 +1,16 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.net.http.HttpResponseCache;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.io.File;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowHttpResponseCacheTest {
   @Before
   public void setUp() {
@@ -29,16 +29,16 @@ public class ShadowHttpResponseCacheTest {
     assertThat(HttpResponseCache.getInstalled()).isNull();
     HttpResponseCache cache = HttpResponseCache.install(File.createTempFile("foo", "bar"), 42);
     HttpResponseCache installed = HttpResponseCache.getInstalled();
-    assertThat(installed).isSameAs(cache);
+    assertThat(installed).isSameInstanceAs(cache);
     assertThat(installed.maxSize()).isEqualTo(42);
   }
 
   @Test
   public void countsStartAtZero() throws Exception {
     HttpResponseCache cache = HttpResponseCache.install(File.createTempFile("foo", "bar"), 42);
-    assertThat(cache.getHitCount()).isZero();
-    assertThat(cache.getNetworkCount()).isZero();
-    assertThat(cache.getRequestCount()).isZero();
+    assertThat(cache.getHitCount()).isEqualTo(0);
+    assertThat(cache.getNetworkCount()).isEqualTo(0);
+    assertThat(cache.getRequestCount()).isEqualTo(0);
   }
 
   @Test

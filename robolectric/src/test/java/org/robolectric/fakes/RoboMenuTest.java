@@ -1,29 +1,26 @@
 package org.robolectric.fakes;
 
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.view.MenuItem;
-import junit.framework.Assert;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
-import org.robolectric.fakes.RoboMenu;
-import org.robolectric.fakes.RoboMenuItem;
-import org.robolectric.shadows.ShadowActivity;
+import org.robolectric.Robolectric;
 import org.robolectric.shadows.ShadowApplication;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.WithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class RoboMenuTest {
 
   @Test
   public void addAndRemoveMenuItems() {
-    RoboMenu menu = new RoboMenu(RuntimeEnvironment.application);
+    RoboMenu menu = new RoboMenu(ApplicationProvider.getApplicationContext());
     menu.add(9, 10, 0, org.robolectric.R.string.ok);
 
     RoboMenuItem item = (RoboMenuItem) menu.findItem(10);
@@ -34,12 +31,12 @@ public class RoboMenuTest {
     menu.removeItem(10);
 
     item = (RoboMenuItem) menu.findItem(10);
-    Assert.assertNull(item);
+    assertNull(item);
   }
 
   @Test
   public void addSubMenu() {
-    RoboMenu menu = new RoboMenu(RuntimeEnvironment.application);
+    RoboMenu menu = new RoboMenu(ApplicationProvider.getApplicationContext());
     menu.addSubMenu(9, 10, 0, org.robolectric.R.string.ok);
 
     RoboMenuItem item = (RoboMenuItem) menu.findItem(10);
@@ -50,17 +47,18 @@ public class RoboMenuTest {
 
   @Test
   public void clickWithIntent() {
-    RoboMenu menu = new RoboMenu(RuntimeEnvironment.application);
+    Activity a = Robolectric.buildActivity(Activity.class).get();
+    RoboMenu menu = new RoboMenu(a);
     menu.add(0, 10, 0, org.robolectric.R.string.ok);
 
     RoboMenuItem item = (RoboMenuItem) menu.findItem(10);
-    Assert.assertNull(item.getIntent());
+    assertNull(item.getIntent());
 
-    Intent intent = new Intent(RuntimeEnvironment.application, Activity.class);
+    Intent intent = new Intent(a, Activity.class);
     item.setIntent(intent);
     item.click();
 
-    Assert.assertNotNull(item);
+    assertNotNull(item);
 
     Intent startedIntent = ShadowApplication.getInstance().getNextStartedActivity();
     assertNotNull(startedIntent);
@@ -68,16 +66,16 @@ public class RoboMenuTest {
 
   @Test
   public void add_AddsItemsInOrder() {
-    RoboMenu menu = new RoboMenu(RuntimeEnvironment.application);
+    RoboMenu menu = new RoboMenu(ApplicationProvider.getApplicationContext());
     menu.add(0, 0, 1, "greeting");
     menu.add(0, 0, 0, "hell0");
     menu.add(0, 0, 0, "hello");
 
     MenuItem item = menu.getItem(0);
-    assertEquals("hell0", item.getTitle());
+    assertEquals("hell0", item.getTitle().toString());
     item = menu.getItem(1);
-    assertEquals("hello", item.getTitle());
+    assertEquals("hello", item.getTitle().toString());
     item = menu.getItem(2);
-    assertEquals("greeting", item.getTitle());
+    assertEquals("greeting", item.getTitle().toString());
   }
 }

@@ -1,24 +1,27 @@
 package org.robolectric.shadows;
 
-import android.net.wifi.WifiConfiguration;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.TestRunners;
-
-import static junit.framework.Assert.assertNotNull;
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertNotNull;
 import static org.robolectric.Shadows.shadowOf;
 
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiEnterpriseConfig;
+import android.os.Build;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.annotation.Config;
+
+@RunWith(AndroidJUnit4.class)
 public class ShadowWifiConfigurationTest {
   @Test
-  public void shouldSetTheBitSetsAndWepKeyArrays() throws Exception {
+  public void shouldSetTheBitSetsAndWepKeyArrays() {
     WifiConfiguration wifiConfiguration = new WifiConfiguration();
     assertNotNull(wifiConfiguration.allowedAuthAlgorithms);
   }
 
   @Test
-  public void shouldCopy() throws Exception {
+  public void shouldCopy() {
     WifiConfiguration wifiConfiguration = new WifiConfiguration();
 
     wifiConfiguration.networkId = 1;
@@ -58,5 +61,79 @@ public class ShadowWifiConfigurationTest {
     assertThat(copy.wepKeys[1]).isEqualTo("1");
     assertThat(copy.wepKeys[2]).isEqualTo("2");
     assertThat(copy.wepKeys[3]).isEqualTo("3");
+  }
+
+  @Test
+  public void shouldCopy_sdk18() {
+    WifiConfiguration wifiConfiguration = new WifiConfiguration();
+
+    wifiConfiguration.networkId = 1;
+    wifiConfiguration.SSID = "SSID";
+
+    WifiEnterpriseConfig enterpriseConfig = new WifiEnterpriseConfig();
+    enterpriseConfig.setIdentity("fake identity");
+    enterpriseConfig.setPassword("fake password");
+    wifiConfiguration.enterpriseConfig = enterpriseConfig;
+
+    WifiConfiguration copy = shadowOf(wifiConfiguration).copy();
+    assertThat(copy.networkId).isEqualTo(1);
+    assertThat(copy.SSID).isEqualTo("SSID");
+    assertThat(copy.enterpriseConfig).isNotNull();
+    assertThat(copy.enterpriseConfig.getIdentity()).isEqualTo("fake identity");
+    assertThat(copy.enterpriseConfig.getPassword()).isEqualTo("fake password");
+  }
+
+  @Config(sdk = Build.VERSION_CODES.LOLLIPOP)
+  @Test
+  public void shouldCopy_sdk21() {
+    WifiConfiguration wifiConfiguration = new WifiConfiguration();
+
+    wifiConfiguration.networkId = 1;
+    wifiConfiguration.SSID = "SSID";
+    wifiConfiguration.creatorUid = 888;
+
+    WifiConfiguration copy = shadowOf(wifiConfiguration).copy();
+
+    assertThat(copy.networkId).isEqualTo(1);
+    assertThat(copy.SSID).isEqualTo("SSID");
+    assertThat(copy.creatorUid).isEqualTo(888);
+  }
+
+  @Config(minSdk = Build.VERSION_CODES.M)
+  @Test
+  public void shouldCopy_sdk23() {
+    WifiConfiguration wifiConfiguration = new WifiConfiguration();
+
+    wifiConfiguration.networkId = 1;
+    wifiConfiguration.SSID = "SSID";
+    wifiConfiguration.creatorName = "creatorName";
+    wifiConfiguration.creatorUid = 888;
+
+    WifiConfiguration copy = shadowOf(wifiConfiguration).copy();
+
+    assertThat(copy.networkId).isEqualTo(1);
+    assertThat(copy.SSID).isEqualTo("SSID");
+    assertThat(copy.creatorName).isEqualTo("creatorName");
+    assertThat(copy.creatorUid).isEqualTo(888);
+  }
+
+  @SuppressWarnings("CheckReturnValue")
+  @Test
+  public void toStringDoesntCrash() {
+    WifiConfiguration wifiConfiguration = new WifiConfiguration();
+    wifiConfiguration.toString();
+
+    wifiConfiguration.SSID = "SSID";
+    wifiConfiguration.toString();
+  }
+
+  @Config(minSdk = Build.VERSION_CODES.R)
+  @Test
+  public void setSecurityParams_shouldWorkCorrectly() {
+    WifiConfiguration wifiConfiguration = new WifiConfiguration();
+    wifiConfiguration.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OPEN);
+
+    assertThat(shadowOf(wifiConfiguration).getSecurityTypes())
+        .containsExactly(WifiConfiguration.SECURITY_TYPE_OPEN);
   }
 }

@@ -1,53 +1,66 @@
 package org.robolectric.shadows;
 
+import static android.content.ClipboardManager.OnPrimaryClipChangedListener;
+import static android.os.Build.VERSION_CODES.O;
+import static android.os.Build.VERSION_CODES.P;
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.os.SystemClock;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.time.Duration;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.TestRunners;
+import org.robolectric.Robolectric;
+import org.robolectric.android.controller.ActivityController;
+import org.robolectric.annotation.Config;
 
-import static android.content.ClipboardManager.OnPrimaryClipChangedListener;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowClipboardManagerTest {
 
   private ClipboardManager clipboardManager;
 
-  @Before public void setUp() throws Exception {
-    clipboardManager = (ClipboardManager) RuntimeEnvironment.application.getSystemService(Context.CLIPBOARD_SERVICE);
+  @Before
+  public void setUp() throws Exception {
+    clipboardManager =
+        (ClipboardManager)
+            ApplicationProvider.getApplicationContext().getSystemService(Context.CLIPBOARD_SERVICE);
   }
 
   @Test
-  public void shouldStoreText() throws Exception {
+  public void shouldStoreText() {
     clipboardManager.setText("BLARG!!!");
     assertThat(clipboardManager.getText().toString()).isEqualTo("BLARG!!!");
   }
 
   @Test
-  public void shouldNotHaveTextIfTextIsNull() throws Exception {
+  public void shouldNotHaveTextIfTextIsNull() {
     clipboardManager.setText(null);
     assertThat(clipboardManager.hasText()).isFalse();
   }
 
   @Test
-  public void shouldNotHaveTextIfTextIsEmpty() throws Exception {
+  public void shouldNotHaveTextIfTextIsEmpty() {
     clipboardManager.setText("");
     assertThat(clipboardManager.hasText()).isFalse();
   }
 
   @Test
-  public void shouldHaveTextIfEmptyString() throws Exception {
+  public void shouldHaveTextIfEmptyString() {
     clipboardManager.setText(" ");
     assertThat(clipboardManager.hasText()).isTrue();
   }
 
   @Test
-  public void shouldHaveTextIfString() throws Exception {
+  public void shouldHaveTextIfString() {
     clipboardManager.setText("BLARG");
     assertThat(clipboardManager.hasText()).isTrue();
   }
@@ -60,19 +73,19 @@ public class ShadowClipboardManagerTest {
   }
 
   @Test
-  public void shouldNotHaveTextIfPrimaryClipIsNull() throws Exception {
+  public void shouldNotHaveTextIfPrimaryClipIsNull() {
     clipboardManager.setPrimaryClip(null);
     assertThat(clipboardManager.hasText()).isFalse();
   }
 
   @Test
-  public void shouldNotHaveTextIfPrimaryClipIsEmpty() throws Exception {
+  public void shouldNotHaveTextIfPrimaryClipIsEmpty() {
     clipboardManager.setPrimaryClip(ClipData.newPlainText(null, ""));
     assertThat(clipboardManager.hasText()).isFalse();
   }
 
   @Test
-  public void shouldHaveTextIfEmptyPrimaryClip() throws Exception {
+  public void shouldHaveTextIfEmptyPrimaryClip() {
     clipboardManager.setPrimaryClip(ClipData.newPlainText(null, " "));
     assertThat(clipboardManager.hasText()).isTrue();
   }
@@ -99,5 +112,75 @@ public class ShadowClipboardManagerTest {
     clipboardManager.removePrimaryClipChangedListener(listener);
     clipboardManager.setPrimaryClip(ClipData.newPlainText(null, "BLARG?"));
     verifyNoMoreInteractions(listener);
+  }
+
+  @Test
+  @Config(minSdk = P)
+  public void shouldClearPrimaryClip() {
+    clipboardManager.setPrimaryClip(ClipData.newPlainText(null, "BLARG?"));
+    clipboardManager.clearPrimaryClip();
+
+    assertThat(clipboardManager.hasText()).isFalse();
+    assertThat(clipboardManager.hasPrimaryClip()).isFalse();
+  }
+
+  @Test
+  @Config(minSdk = P)
+  public void shouldClearPrimaryClipAndFireListeners() {
+    OnPrimaryClipChangedListener listener = mock(OnPrimaryClipChangedListener.class);
+    clipboardManager.addPrimaryClipChangedListener(listener);
+    clipboardManager.clearPrimaryClip();
+
+    verify(listener).onPrimaryClipChanged();
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void shouldSetTimestampForClip() {
+    long currentUptimeMs = SystemClock.uptimeMillis();
+    ShadowSystemClock.advanceBy(Duration.ofSeconds(47));
+    ClipData clip = ClipData.newPlainText(null, "BLARG?");
+    clipboardManager.setPrimaryClip(clip);
+    assertThat(clipboardManager.getPrimaryClipDescription()).isNotNull();
+    assertThat(clipboardManager.getPrimaryClipDescription().getTimestamp())
+        .isEqualTo(currentUptimeMs + 47 * 1000);
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void shouldSetTimestampForText() {
+    long currentUptimeMs = SystemClock.uptimeMillis();
+    ShadowSystemClock.advanceBy(Duration.ofSeconds(42));
+    clipboardManager.setText("BLARG!!!");
+    assertThat(clipboardManager.getPrimaryClipDescription()).isNotNull();
+    assertThat(clipboardManager.getPrimaryClipDescription().getTimestamp())
+        .isEqualTo(currentUptimeMs + 42 * 1000);
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void clipboardManager_instance_retrievesSamePrimaryClip() {
+    String originalProperty = System.getProperty("robolectric.createActivityContexts", "");
+    System.setProperty("robolectric.createActivityContexts", "true");
+    try (ActivityController<Activity> controller =
+        Robolectric.buildActivity(Activity.class).setup()) {
+      ClipboardManager applicationClipboardManager =
+          (ClipboardManager)
+              ApplicationProvider.getApplicationContext()
+                  .getSystemService(Context.CLIPBOARD_SERVICE);
+      ClipData clipData = ClipData.newPlainText("label", "text");
+      applicationClipboardManager.setPrimaryClip(clipData);
+
+      Activity activity = controller.get();
+      ClipboardManager activityClipboardManager =
+          (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+
+      ClipData applicationClipData = applicationClipboardManager.getPrimaryClip();
+      ClipData activityClipData = activityClipboardManager.getPrimaryClip();
+
+      assertThat(activityClipData.toString()).isEqualTo(applicationClipData.toString());
+    } finally {
+      System.setProperty("robolectric.createActivityContexts", originalProperty);
+    }
   }
 }

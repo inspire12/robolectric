@@ -1,26 +1,21 @@
 package org.robolectric.shadows;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CursorAdapter;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.Shadows;
-import org.robolectric.TestRunners;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static android.widget.CursorAdapter.FLAG_AUTO_REQUERY;
-import static android.widget.CursorAdapter.FLAG_REGISTER_CONTENT_OBSERVER;
-import static org.assertj.core.api.Assertions.assertThat;
-
-@RunWith(TestRunners.MultiApiWithDefaults.class)
+@RunWith(AndroidJUnit4.class)
 public class ShadowCursorAdapterTest {
 
   private Cursor curs;
@@ -32,11 +27,11 @@ public class ShadowCursorAdapterTest {
     database = SQLiteDatabase.create(null);
     database.execSQL("CREATE TABLE table_name(_id INT PRIMARY KEY, name VARCHAR(255));");
     String[] inserts = {
-        "INSERT INTO table_name (_id, name) VALUES(1234, 'Chuck');",
-        "INSERT INTO table_name (_id, name) VALUES(1235, 'Julie');",
-        "INSERT INTO table_name (_id, name) VALUES(1236, 'Chris');",
-        "INSERT INTO table_name (_id, name) VALUES(1237, 'Brenda');",
-        "INSERT INTO table_name (_id, name) VALUES(1238, 'Jane');"
+      "INSERT INTO table_name (_id, name) VALUES(1234, 'Chuck');",
+      "INSERT INTO table_name (_id, name) VALUES(1235, 'Julie');",
+      "INSERT INTO table_name (_id, name) VALUES(1236, 'Chris');",
+      "INSERT INTO table_name (_id, name) VALUES(1237, 'Brenda');",
+      "INSERT INTO table_name (_id, name) VALUES(1238, 'Jane');"
     };
 
     for (String insert : inserts) {
@@ -49,10 +44,16 @@ public class ShadowCursorAdapterTest {
     adapter = new TestAdapter(curs);
   }
 
+  @After
+  public void tearDown() {
+    database.close();
+    curs.close();
+  }
+
   @Test
   public void testChangeCursor() {
     assertThat(adapter.getCursor()).isNotNull();
-    assertThat(adapter.getCursor()).isSameAs(curs);
+    assertThat(adapter.getCursor()).isSameInstanceAs(curs);
 
     adapter.changeCursor(null);
 
@@ -63,11 +64,11 @@ public class ShadowCursorAdapterTest {
   @Test
   public void testSwapCursor() {
     assertThat(adapter.getCursor()).isNotNull();
-    assertThat(adapter.getCursor()).isSameAs(curs);
+    assertThat(adapter.getCursor()).isSameInstanceAs(curs);
 
     Cursor oldCursor = adapter.swapCursor(null);
 
-    assertThat(oldCursor).isSameAs(curs);
+    assertThat(oldCursor).isSameInstanceAs(curs);
     assertThat(curs.isClosed()).isFalse();
     assertThat(adapter.getCursor()).isNull();
   }
@@ -87,52 +88,22 @@ public class ShadowCursorAdapterTest {
   }
 
   @Test
-  public void testGetView() {
-    List<View> views = new ArrayList<>();
-    for (int i = 0; i < 5; i++) {
-      views.add(new View(RuntimeEnvironment.application));
-    }
-
-    Shadows.shadowOf(adapter).setViews(views);
-
-    for (int i = 0; i < 5; i++) {
-      assertThat(adapter.getView(i, null, null)).isSameAs(views.get(i));
+  public void shouldNotErrorOnCursorChangeWhenNoFlagsAreSet() {
+    try (Cursor newCursor = database.rawQuery("SELECT * FROM table_name;", null)) {
+      adapter = new TestAdapterWithFlags(curs, 0);
+      adapter.changeCursor(newCursor);
+      assertThat(adapter.getCursor()).isNotSameInstanceAs(curs);
     }
   }
 
-  @Test public void shouldNotRegisterObserversIfNoFlagsAreSet() throws Exception {
-    adapter = new TestAdapterWithFlags(curs, 0);
-    assertThat(Shadows.shadowOf(adapter).mChangeObserver).isNull();
-    assertThat(Shadows.shadowOf(adapter).mDataSetObserver).isNull();
-  }
-
-  @Test public void shouldRegisterObserversWhenRegisterObserverFlagIsSet() throws Exception {
-    adapter = new TestAdapterWithFlags(curs, FLAG_REGISTER_CONTENT_OBSERVER);
-    assertThat(Shadows.shadowOf(adapter).mChangeObserver).isNotNull();
-    assertThat(Shadows.shadowOf(adapter).mDataSetObserver).isNotNull();
-  }
-
-  @Test public void shouldRegisterObserversWhenAutoRequeryFlagIsSet() throws Exception {
-    adapter = new TestAdapterWithFlags(curs, FLAG_AUTO_REQUERY);
-    assertThat(Shadows.shadowOf(adapter).mChangeObserver).isNotNull();
-    assertThat(Shadows.shadowOf(adapter).mDataSetObserver).isNotNull();
-  }
-
-  @Test public void shouldNotErrorOnCursorChangeWhenNoFlagsAreSet() throws Exception {
-    adapter = new TestAdapterWithFlags(curs, 0);
-    adapter.changeCursor(database.rawQuery("SELECT * FROM table_name;", null));
-    assertThat(adapter.getCursor()).isNotSameAs(curs);
-  }
-
-  private class TestAdapter extends CursorAdapter {
+  private static class TestAdapter extends CursorAdapter {
 
     public TestAdapter(Cursor curs) {
-      super(RuntimeEnvironment.application, curs, false);
+      super(ApplicationProvider.getApplicationContext(), curs, false);
     }
 
     @Override
-    public void bindView(View view, Context context, Cursor cursor) {
-    }
+    public void bindView(View view, Context context, Cursor cursor) {}
 
     @Override
     public View newView(Context context, Cursor cursor, ViewGroup parent) {
@@ -140,16 +111,17 @@ public class ShadowCursorAdapterTest {
     }
   }
 
-  private class TestAdapterWithFlags extends CursorAdapter {
+  private static class TestAdapterWithFlags extends CursorAdapter {
     public TestAdapterWithFlags(Cursor c, int flags) {
-      super(RuntimeEnvironment.application, c, flags);
+      super(ApplicationProvider.getApplicationContext(), c, flags);
     }
 
-    @Override public View newView(Context context, Cursor cursor, ViewGroup parent) {
+    @Override
+    public View newView(Context context, Cursor cursor, ViewGroup parent) {
       return null;
     }
 
-    @Override public void bindView(View view, Context context, Cursor cursor) {
-    }
+    @Override
+    public void bindView(View view, Context context, Cursor cursor) {}
   }
 }
